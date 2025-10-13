@@ -1,0 +1,33 @@
+<div class="register-container">
+  <h2>Registro</h2>
+
+  <div class="switch">
+    <label>
+      <input type="radio" name="tipo" [value]="'paciente'" (change)="tipo='paciente'" [checked]="tipo==='paciente'"> Paciente
+    </label>
+    <label>
+      <input type="radio" name="tipo" [value]="'medico'" (change)="tipo='medico'" [checked]="tipo==='medico'"> Médico
+    </label>
+  </div>
+
+  <form [formGroup]="form" (ngSubmit)="onSubmit()">
+    <input type="text" placeholder="Nombre" formControlName="nombre" required />
+    <input type="text" placeholder="Usuario" formControlName="username" required />
+    <input type="password" placeholder="Contraseña" formControlName="password" required />
+
+    <div *ngIf="tipo === 'paciente'">
+      <input type="text" placeholder="DNI" formControlName="dni" />
+      <input type="text" placeholder="Teléfono" formControlName="telefono" />
+    </div>
+
+    <div *ngIf="tipo === 'medico'">
+      <input type="text" placeholder="Especialidad" formControlName="especialidad" />
+    </div>
+
+    <button type="submit">Registrarme</button>
+  </form>
+
+  <p class="back-login">
+    ¿Ya tienes cuenta? <a routerLink="/login">Inicia sesión</a>
+  </p>
+</div>

@@ -1,0 +1,9 @@
+
+<nav>
+  <a *ngIf="isAdmin" routerLink="/usuarios/list">Usuarios</a>
+  <a *ngIf="isAdmin" routerLink="/medicos/list">Médicos</a>
+  <a *ngIf="isAdmin" routerLink="/pacientes/list">Pacientes</a>
+  <a *ngIf="isMedico" routerLink="/citas/list">Citas</a>
+  <a *ngIf="isPaciente" routerLink="/citas/list">Mis citas</a>
+  <a (click)="logout()">Cerrar sesión</a>
+</nav>
