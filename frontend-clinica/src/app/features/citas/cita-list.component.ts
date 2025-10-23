@@ -42,6 +42,7 @@ import { AuthService } from '../../core/services/auth.service';
 
           <!-- Mostrar nombre del paciente solo para admin -->
           <td *ngIf="esAdmin">
+            {{c.paciente?.id}} --
             {{ c.paciente?.nombre || '—' }}
           </td>
 
@@ -78,7 +79,7 @@ export class CitaListComponent implements OnInit {
   }
 
   cargarCitas(): void {
-    this.citaService.listar().subscribe({
+    this.citaService.listarDetalles().subscribe({
       next: (data) => (this.citas = data),
       error: (err) => console.error('Error al listar citas:', err)
     });

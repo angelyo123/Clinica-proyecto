@@ -7,7 +7,7 @@ import { Cita } from '../../core/models/cita.model';
   providedIn: 'root'
 })
 export class CitaService {
-  private apiUrl = 'http://localhost:8080/cita'; // ✅ correcto
+  private apiUrl = 'http://localhost:8084/cita'; // ✅ correcto
 
   constructor(private http: HttpClient) {}
 
@@ -20,23 +20,28 @@ export class CitaService {
   }
 
   listar(): Observable<Cita[]> {
-    return this.http.get<Cita[]>(this.apiUrl, { headers: this.getAuthHeaders() });
+    return this.http.get<Cita[]>(`${this.apiUrl}/listar`, { headers: this.getAuthHeaders() });
+  }
+
+  listarDetalles(): Observable<Cita[]> {
+    // Llama al nuevo endpoint que creaste en el backend
+    return this.http.get<Cita[]>(`${this.apiUrl}/listar/detalles`, { headers: this.getAuthHeaders() });
   }
 
   obtener(id: number): Observable<Cita> {
-    return this.http.get<Cita>(`${this.apiUrl}/${id}`, { headers: this.getAuthHeaders() });
+    return this.http.get<Cita>(`${this.apiUrl}/detalle/${id}`, { headers: this.getAuthHeaders() });
   }
 
   crearCita(cita: Cita): Observable<Cita> {
     // 👇 ya no duplicas /user/citas
-    return this.http.post<Cita>(this.apiUrl, cita, { headers: this.getAuthHeaders() });
+    return this.http.post<Cita>(`${this.apiUrl}/crear/detalle`, cita, { headers: this.getAuthHeaders() });
   }
 
   actualizar(id: number, cita: Cita): Observable<Cita> {
-    return this.http.put<Cita>(`${this.apiUrl}/${id}`, cita, { headers: this.getAuthHeaders() });
+    return this.http.put<Cita>(`${this.apiUrl}/actualizar/detalle/${id}`, cita, { headers: this.getAuthHeaders() });
   }
 
   eliminar(id: number): Observable<void> {
-    return this.http.delete<void>(`${this.apiUrl}/${id}`, { headers: this.getAuthHeaders() });
+    return this.http.delete<void>(`${this.apiUrl}/eliminar/${id}`, { headers: this.getAuthHeaders() });
   }
 }

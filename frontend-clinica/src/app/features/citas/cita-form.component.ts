@@ -111,6 +111,8 @@ export class CitaFormComponent implements OnInit {
     this.cdr.detectChanges(); // 🔁 fuerza la actualización del DOM
   }
 
+
+  
   guardar(): void {
     if (this.form.invalid) return;
 
@@ -139,6 +141,10 @@ export class CitaFormComponent implements OnInit {
       }
     });
   }
+
+
+
+  
 
   cancelar(): void {
     this.router.navigate(['/citas']);

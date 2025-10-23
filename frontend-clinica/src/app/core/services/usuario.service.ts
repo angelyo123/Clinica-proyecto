@@ -5,7 +5,7 @@ import { Usuario } from '../models/usuario.model';
 
 @Injectable({ providedIn: 'root' })
 export class UsuarioService {
-  private readonly apiUrl = 'http://localhost:8080/admin/usuario';
+  private readonly apiUrl = 'http://localhost:8081/admin/usuario';
 
   constructor(private http: HttpClient) {}
 
