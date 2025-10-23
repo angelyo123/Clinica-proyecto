@@ -19,7 +19,7 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/paciente")
-@PreAuthorize("hasAnyAuthority('ROLE_PACIENTE', 'ROLE_ADMIN', 'ROLE_MEDICO')")
+//@PreAuthorize("hasAnyAuthority('ROLE_PACIENTE', 'ROLE_ADMIN', 'ROLE_MEDICO')")
 public class PacienteController {
 
     @Autowired

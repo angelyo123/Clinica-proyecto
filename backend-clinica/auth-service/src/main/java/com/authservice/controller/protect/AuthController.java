@@ -17,6 +17,9 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.HashMap;
+import java.util.Map;
+
 @RestController
 @RequestMapping("/auth")
 @CrossOrigin(origins = "http://localhost:4200") // para Angular
@@ -45,10 +48,15 @@ public class AuthController {
     }
 
     @PostMapping("/register/paciente")
-    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
-    public ResponseEntity<?> registerPaciente(@RequestBody Usuario usuario) {
+    public ResponseEntity<Map<String, Object>> registerPaciente(@RequestBody Usuario usuario) {
         Usuario nuevo = usuarioService.registrarPaciente(usuario);
-        return ResponseEntity.ok("Paciente registrado correctamente con ID: " + nuevo.getId());
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("id", nuevo.getId());
+        response.put("username", nuevo.getUsername());
+        response.put("mensaje", "Paciente registrado correctamente");
+
+        return ResponseEntity.ok(response);
     }
 
     // ✅ REGISTRO MÉDICO
