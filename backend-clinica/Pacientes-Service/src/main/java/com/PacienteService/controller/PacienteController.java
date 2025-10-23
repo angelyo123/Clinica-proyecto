@@ -1,5 +1,6 @@
 package com.PacienteService.controller;
 
+import com.PacienteService.client.AutomatizacionClient;
 import com.PacienteService.client.CitaClient;
 import com.PacienteService.client.MedicoClient;
 import com.PacienteService.model.Paciente;
@@ -29,6 +30,8 @@ public class PacienteController {
 
     @Autowired
     private CitaClient citaClient;
+    @Autowired
+    private AutomatizacionClient automatizacionClient;
 
     // ✅ CRUD básico de pacientes
     @GetMapping("/listar")
@@ -74,6 +77,23 @@ public class PacienteController {
     public PacienteBasicoDTO obtenerPublico(@PathVariable Long id) {
         Paciente p = pacienteService.ObtenerId(id);
         return new PacienteBasicoDTO(p.getId(), p.getNombre(), p.getTelefono());
+    }
+
+    @PostMapping("/ia/solicitud")
+    @PreAuthorize("hasAuthority('ROLE_PACIENTE')")
+    public ResponseEntity<?> solicitarIA(@RequestBody Map<String, String> body) {
+        String mensaje = body.get("mensaje");
+        Long pacienteId = Long.valueOf(body.get("pacienteId"));
+
+        Map<String, Object> solicitud = Map.of(
+                "pacienteId", pacienteId,
+                "mensaje", mensaje
+        );
+
+        // 🔹 Llamamos al microservicio de Automatización
+        Map<String, Object> respuesta = automatizacionClient.enviarSolicitudIA(solicitud);
+
+        return ResponseEntity.ok(respuesta);
     }
 
 }
