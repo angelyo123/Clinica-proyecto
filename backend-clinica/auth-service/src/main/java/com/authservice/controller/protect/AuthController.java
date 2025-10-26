@@ -47,10 +47,6 @@ public class AuthController {
         return ResponseEntity.ok(new JwtResponse(token));
     }
 //quite el preauthority porq no me dejaba
-@PostMapping("/register/paciente")
-public ResponseEntity<Map<String, Object>> registerPaciente(@RequestBody Map<String, Object> request) {
-    String username = (String) request.get("username");
-    String password = (String) request.get("password");
 
     @PostMapping("/register/paciente")
     public ResponseEntity<Map<String, Object>> registerPaciente(@RequestBody Usuario usuario) {
@@ -83,5 +79,4 @@ public ResponseEntity<Map<String, Object>> registerPaciente(@RequestBody Map<Str
         return ResponseEntity.ok(response);
     }
 
-}
 }
