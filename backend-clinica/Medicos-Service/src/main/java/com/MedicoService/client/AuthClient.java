@@ -6,7 +6,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 
 import java.util.Map;
 
-@FeignClient(name = "auth-service", url = "http://localhost:8081/auth")
+@FeignClient(name = "auth-service", url = "http://localhost:8081/auth", configuration = com.MedicoService.config.FeignConfig.class
+)
 public interface AuthClient {
 
     @PostMapping("/register/medico")

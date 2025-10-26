@@ -26,7 +26,7 @@ public class JwtUtil {
         return Keys.hmacShaKeyFor(SECRET_KEY.getBytes());
     }
 
-    /** 🔹 Generar token con roles incluidos **/
+    // 🔹 Generar token con roles incluidos //
     public String generateToken(Authentication authentication) {
         UserDetails userPrincipal = (UserDetails) authentication.getPrincipal();
 
@@ -45,12 +45,12 @@ public class JwtUtil {
                 .compact();
     }
 
-    /** 🔹 Extraer username del token **/
+    // 🔹 Extraer username del token
     public String extractUsername(String token) {
         return extractAllClaims(token).getSubject();
     }
 
-    /** 🔹 Extraer roles del token **/
+    // 🔹 Extraer roles del token
     public List<String> extractRoles(String token) {
         Claims claims = extractAllClaims(token);
         return claims.get("roles", List.class);
@@ -64,7 +64,7 @@ public class JwtUtil {
                 .getBody();
     }
 
-    /** 🔹 Validar token **/
+    //🔹 Validar token
     public boolean validateToken(String token, UserDetails userDetails) {
         final String username = extractUsername(token);
         return (username.equals(userDetails.getUsername()) && !isTokenExpired(token));
