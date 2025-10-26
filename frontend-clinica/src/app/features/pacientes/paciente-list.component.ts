@@ -29,7 +29,7 @@ import { Paciente } from '../../core/models/paciente.model';
           <td>{{ p.nombre }}</td>
           <td>{{ p.dni }}</td>
           <td>{{ p.telefono }}</td>
-          <td>{{ p.usuario?.username }}</td>
+          <td>{{ p.usuario }}</td>
           <td>
             <button [routerLink]="['/pacientes/editar', p.id]">Editar</button>
             <button (click)="eliminar(p.id!)">Eliminar</button>

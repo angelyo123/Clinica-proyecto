@@ -1,15 +1,24 @@
 import { Injectable } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { Paciente } from '../models/paciente.model';
 
 @Injectable({ providedIn: 'root' })
 export class PacienteService {
     
-    private readonly apiUrl= 'http://localhost:8081/admin/paciente'
+    private readonly apiUrl= 'http://localhost:8082/paciente'
 
     constructor(private http: HttpClient){}
 
+       private getAuthHeaders(): HttpHeaders {
+        const token = localStorage.getItem('token');
+        return new HttpHeaders({
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+        });
+    }
+
+    
     listar():Observable<Paciente[]>{
         return this.http.get<Paciente[]>(`${this.apiUrl}/listar`);
     }
@@ -29,6 +38,10 @@ export class PacienteService {
     eliminar(id:number):Observable<void>{
         return this.http.delete<void>(`${this.apiUrl}/eliminar/${id}`);
     }
-
+       obtenerPerfil(): Observable<Paciente> {
+        return this.http.get<Paciente>(`${this.apiUrl}/perfil`, { 
+            headers: this.getAuthHeaders() 
+        });
+    }
   }
 
