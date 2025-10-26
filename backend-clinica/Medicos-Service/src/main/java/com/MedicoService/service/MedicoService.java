@@ -11,6 +11,4 @@ public interface MedicoService {
     Medico crear(Medico medico);
     Medico actualizar(Long id, Medico medico);
     void eliminar(Long id);
-    Medico obtenerPorUsuario(String username);
-
 }

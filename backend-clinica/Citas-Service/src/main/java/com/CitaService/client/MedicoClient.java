@@ -12,9 +12,6 @@ import java.util.Map;
         configuration = com.CitaService.config.FeignConfig.class
 )
 public interface MedicoClient {
-    @GetMapping("/medico/{id}")
-    Map<String, Object> findById(@PathVariable("id") Long id);
-
     @GetMapping("/obtener/{id}")
     Map<String, Object> obtener(@PathVariable Long id);
 }

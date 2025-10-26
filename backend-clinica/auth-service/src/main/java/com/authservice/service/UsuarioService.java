@@ -8,7 +8,6 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.util.Collections;
-import java.util.List;
 
 @Service
 public class UsuarioService {
@@ -23,9 +22,6 @@ public class UsuarioService {
         this.usuarioRepository = usuarioRepository;
         this.rolRepository = rolRepository;
         this.passwordEncoder = passwordEncoder;
-    }
-    public List<Usuario> listarTodos() {
-        return usuarioRepository.findAll();
     }
 
     public Usuario registrarPaciente(Usuario usuario) {

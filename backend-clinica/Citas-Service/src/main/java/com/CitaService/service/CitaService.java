@@ -17,9 +17,4 @@ public interface CitaService {
 
     CitaDTO obtenerDetalle(Long id);
     List<CitaMedicoDTO> listarCitasPorMedicoConPacientes(Long medicoId);
-    List<CitaDTO> listarDetalles();
-    CitaDTO crearDetalle(CitaDTO citaDTO);
-    CitaDTO actualizarDetalle(Long id, CitaDTO citaDTO);
-    List<CitaDTO> listarDetallesPorPaciente(Long pacienteId);
-    List<CitaMedicoDTO> listarDetallesPorMedico(Long medicoId); //
 }

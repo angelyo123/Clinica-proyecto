@@ -65,34 +65,4 @@ public class CitaController {
         return ResponseEntity.ok(citaService.listarCitasPorMedicoConPacientes(medicoId));
     }
 
-    @GetMapping("/listar/detalles")
-    public List<CitaDTO> listarDetalles() {
-        return citaService.listarDetalles();
-    }
-
-    @PostMapping("/crear/detalle")
-    public ResponseEntity<CitaDTO> crearDetalle(@RequestBody CitaDTO citaDTO) {
-        CitaDTO citaCreada = citaService.crearDetalle(citaDTO);
-        return ResponseEntity.status(201).body(citaCreada); // 201 Created
-    }
-
-    @PutMapping("/actualizar/detalle/{id}")
-    public ResponseEntity<CitaDTO> actualizarDetalle(@PathVariable Long id, @RequestBody CitaDTO citaDTO) {
-        CitaDTO citaActualizada = citaService.actualizarDetalle(id, citaDTO);
-        return ResponseEntity.ok(citaActualizada);
-    }
-
-    @GetMapping("/listarPorPaciente/detalles")
-    @PreAuthorize("hasAnyAuthority('ROLE_PACIENTE', 'ROLE_ADMIN')")
-    public List<CitaDTO> listarDetallesPorPaciente(@RequestParam Long pacienteId) {
-
-        return citaService.listarDetallesPorPaciente(pacienteId);
-    }
-
-    @GetMapping("/listarPorMedico/detalles")
-    @PreAuthorize("hasAnyAuthority('ROLE_MEDICO', 'ROLE_ADMIN')")
-    public List<CitaMedicoDTO> listarDetallesPorMedico(@RequestParam Long medicoId) {
-
-        return citaService.listarDetallesPorMedico(medicoId);
-    }
 }
