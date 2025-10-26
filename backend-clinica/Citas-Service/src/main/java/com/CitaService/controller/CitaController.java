@@ -13,7 +13,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/cita")
-@PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_MEDICO','ROLE_PACIENTE')")
+//@PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_MEDICO','ROLE_PACIENTE')")
 public class CitaController {
 
     @Autowired

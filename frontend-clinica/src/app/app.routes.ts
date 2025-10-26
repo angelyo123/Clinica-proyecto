@@ -7,14 +7,16 @@ import { MEDICOS_ROUTES } from './features/medicos/medicos.routes';
 import { USUARIOS_ROUTES } from './features/usuarios/usuarios.routes';
 import { CITA_ROUTES } from './features/citas/citas.routes';
 import { RegisterComponent } from './shared/components/register/register.component';
-
+import { HORARIO_ROUTES } from './features/horarios/horario.routes';
 
 export const routes: Routes = [
   { path: '', redirectTo: 'login', pathMatch: 'full' },
   { path: 'login', component: LoginComponent },
   { path: 'register', component: RegisterComponent },
+  { path: 'dashboard', component: Dashboard, canActivate: [AuthGuard] },
   { path: 'usuarios', canActivate: [AuthGuard], children: USUARIOS_ROUTES },
   { path: 'medicos', canActivate: [AuthGuard], children: MEDICOS_ROUTES },
   { path: 'pacientes', canActivate: [AuthGuard], children: PACIENTES_ROUTES },
   { path: 'citas', canActivate: [AuthGuard], children: CITA_ROUTES },
+  { path: 'horarios', canActivate: [AuthGuard], children: HORARIO_ROUTES }
 ];

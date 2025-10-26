@@ -1,3 +1,33 @@
-<h2>Bienvenido al Dashboard</h2>
-<p>Solo usuarios autenticados pueden ver esta página 🚀</p>
-<button (click)="logout()">Cerrar sesión</button>
+<div class="dashboard-container">
+  <h2>Bienvenido al Dashboard 🚀</h2>
+  <p>Selecciona la sección que deseas gestionar:</p>
+
+  <div class="dashboard-cards">
+    <div class="card" (click)="goTo('usuarios')">
+      <h3>Usuarios</h3>
+      <p>Gestiona todos los usuarios de la plataforma</p>
+    </div>
+
+    <div class="card" (click)="goTo('medicos')">
+      <h3>Médicos</h3>
+      <p>Administra los médicos registrados</p>
+    </div>
+
+    <div class="card" (click)="goTo('pacientes')">
+      <h3>Pacientes</h3>
+      <p>Consulta y gestiona los pacientes</p>
+    </div>
+
+    <div class="card" (click)="goTo('citas')">
+      <h3>Citas</h3>
+      <p>Revisa y administra las citas médicas</p>
+    </div>
+
+    <div class="card" (click)="goTo('horarios')">
+      <h3>Horarios</h3>
+      <p>Consulta los horarios de atención junto a los médicos</p>
+    </div>
+  </div>
+
+  <button class="logout-btn" (click)="logout()">Cerrar sesión</button>
+</div>

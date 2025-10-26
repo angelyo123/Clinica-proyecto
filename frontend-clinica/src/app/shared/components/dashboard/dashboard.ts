@@ -1,18 +1,20 @@
 import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
+import { Router } from '@angular/router'; // ✅ Importar Router
 
 @Component({
   selector: 'app-dashboard',
   standalone: true,
   imports: [CommonModule],
-  templateUrl: './dashboard.html',   // ✅ usar archivo externo
-  styleUrls: ['./dashboard.css']     // opcional, si existe
+  templateUrl: './dashboard.html',
+  styleUrls: ['./dashboard.css']
 })
 export class Dashboard {
   data: any;
 
-  constructor(private http: HttpClient) {}
+  constructor(private http: HttpClient,
+              private router: Router) {} // ✅ Inyectar Router
 
   loadData() {
     this.http.get('http://localhost:8080/admin/dashboard').subscribe({
@@ -22,8 +24,11 @@ export class Dashboard {
   }
 
   logout() {
-  localStorage.removeItem('token');
-  window.location.href = '/login';
-}
+    localStorage.removeItem('token');
+    this.router.navigate(['/login']); // Mejor que usar window.location.href
+  }
 
+  goTo(path: string) {
+    this.router.navigate([`/${path}`]); // Ahora funcionará
+  }
 }

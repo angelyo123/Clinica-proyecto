@@ -52,20 +52,17 @@ public ResponseEntity<Map<String, Object>> registerPaciente(@RequestBody Map<Str
     String username = (String) request.get("username");
     String password = (String) request.get("password");
 
-    // Crear Usuario temporal
-    Usuario usuario = new Usuario();
-    usuario.setUsername(username);
-    usuario.setPassword(password);
+    @PostMapping("/register/paciente")
+    public ResponseEntity<Map<String, Object>> registerPaciente(@RequestBody Usuario usuario) {
+        Usuario nuevo = usuarioService.registrarPaciente(usuario);
 
-    Usuario nuevo = usuarioService.registrarPaciente(usuario);
+        Map<String, Object> response = new HashMap<>();
+        response.put("id", nuevo.getId());
+        response.put("username", nuevo.getUsername());
+        response.put("mensaje", "Paciente registrado correctamente");
 
-    // ✅ Retornar JSON
-    Map<String, Object> response = new HashMap<>();
-    response.put("usuarioId", nuevo.getId());
-    response.put("username", nuevo.getUsername());
-
-    return ResponseEntity.ok(response);
-}
+        return ResponseEntity.ok(response);
+    }
 
     // ✅ REGISTRO MÉDICO
     @PostMapping("/register/medico")
@@ -86,4 +83,5 @@ public ResponseEntity<Map<String, Object>> registerPaciente(@RequestBody Map<Str
         return ResponseEntity.ok(response);
     }
 
+}
 }

@@ -1,4 +1,4 @@
-package com.PacienteService.security;
+package com.horariosservice.security;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -67,3 +67,4 @@ public class SecurityConfig {
         return source;
     }
 }
+
