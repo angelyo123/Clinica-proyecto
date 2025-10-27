@@ -61,7 +61,9 @@ public class MedicoServiceImpl implements MedicoService {
         medicoRepository.deleteById(id);
     }
 
+    @Override
     public Medico obtenerPorUsuario(String username) {
-        return medicoRepository.findByUsuario(username).orElse(null);
+        return medicoRepository.findByUsuario(username)
+                .orElseThrow(() -> new RuntimeException("Médico no encontrado con username: " + username));
     }
 }

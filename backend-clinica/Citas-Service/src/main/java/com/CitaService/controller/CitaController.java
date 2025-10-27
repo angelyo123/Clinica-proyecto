@@ -45,7 +45,7 @@ public class CitaController {
     }
 
     @PutMapping("/actualizarEstado/{id}")
-    public Cita actualizarEstado(@PathVariable Long id, @RequestParam String estado) {
+    public CitaDTO actualizarEstado(@PathVariable Long id, @RequestParam String estado) {
         return citaService.actualizarEstado(id, estado);
     }
 
@@ -91,7 +91,7 @@ public class CitaController {
 
     @GetMapping("/listarPorMedico/detalles")
     @PreAuthorize("hasAnyAuthority('ROLE_MEDICO', 'ROLE_ADMIN')")
-    public List<CitaMedicoDTO> listarDetallesPorMedico(@RequestParam Long medicoId) {
+    public List<CitaDTO> listarDetallesPorMedico(@RequestParam Long medicoId) {
 
         return citaService.listarDetallesPorMedico(medicoId);
     }

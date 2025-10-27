@@ -1,4 +1,4 @@
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
 import { Medico } from '../models/medico.model';
@@ -7,11 +7,17 @@ import { Medico } from '../models/medico.model';
   providedIn: 'root'
 })
 export class MedicoService {
-  private apiUrl = 'http://localhost:8081/admin/medico';
+  private apiUrl = 'http://localhost:8083/medico';
 
   constructor(private http:HttpClient){
   }
-
+  private getAuthHeaders(): HttpHeaders {
+        const token = localStorage.getItem('token');
+        return new HttpHeaders({
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+        });
+    }
   listar():Observable<Medico[]>{
     return this.http.get<Medico[]>(`${this.apiUrl}/listar`);
   }
@@ -34,12 +40,16 @@ export class MedicoService {
 
 
   listarAdmin() {
-  return this.http.get<Medico[]>('http://localhost:8080/admin/medicos/listar');
+  return this.http.get<Medico[]>('http://localhost:8081/admin/medicos/listar');
 }
 
 listarPublico() {
-  return this.http.get<Medico[]>('http://localhost:8080/paciente/medicos');
+  return this.http.get<Medico[]>('http://localhost:8081/paciente/medicos');
 }
 
-
+obtenerPerfil(): Observable<Medico> {
+        return this.http.get<Medico>(`${this.apiUrl}/perfil`, { 
+            headers: this.getAuthHeaders() 
+        });
+    }
 }

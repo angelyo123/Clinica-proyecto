@@ -33,7 +33,7 @@ export class LoginComponent  {
         this.authService.saveToken(res.token);
         const roles = this.authService.getUserRoles();
 
-        if (roles.includes('ROLE_ADMIN')) this.router.navigate(['/usuarios']);
+        if (roles.includes('ROLE_ADMIN')) this.router.navigate(['/dashboard']);
         else if (roles.includes('ROLE_MEDICO')) this.router.navigate(['/citas']);
         else if (roles.includes('ROLE_PACIENTE')) this.router.navigate(['/medicos']); // 👈 ver médicos para pedir cita
         else this.router.navigate(['/login']);

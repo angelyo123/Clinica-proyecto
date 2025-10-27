@@ -1,4 +1,4 @@
-package com.CitaService.model;
+ package com.CitaService.model;
 
 import lombok.Data;
 
@@ -11,4 +11,5 @@ public class CitaMedicoDTO {
     private LocalDateTime fechaHora;
     private String estado;
     private Map<String, Object> paciente;
+    private Map<String, Object> medico;
 }
