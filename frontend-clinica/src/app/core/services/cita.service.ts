@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { HttpClient, HttpHeaders } from '@angular/common/http';
+import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { Cita } from '../../core/models/cita.model';
 
@@ -22,12 +22,30 @@ export class CitaService {
   listar(): Observable<Cita[]> {
     return this.http.get<Cita[]>(`${this.apiUrl}/listar`, { headers: this.getAuthHeaders() });
   }
-
+actualizarEstado(id: number, estado: string): Observable<Cita> {
+  const params = new HttpParams().set('estado', estado);
+  return this.http.put<Cita>(`${this.apiUrl}/actualizarEstado/${id}`, null, {
+    params,
+    headers: this.getAuthHeaders()
+  });
+}
   listarDetalles(): Observable<Cita[]> {
     // Llama al nuevo endpoint que creaste en el backend
     return this.http.get<Cita[]>(`${this.apiUrl}/listar/detalles`, { headers: this.getAuthHeaders() });
   }
+// --- NUEVO MÉTODO PARA PACIENTE ---
+  listarDetallesPorPaciente(pacienteId: number): Observable<Cita[]> {
+    const params = new HttpParams().set('pacienteId', pacienteId.toString());
+    return this.http.get<Cita[]>(`${this.apiUrl}/listarPorPaciente/detalles`, { params });
+  }
 
+  // --- NUEVO MÉTODO PARA MÉDICO ---
+  // Cambia 'any[]' por 'CitaMedicoDTO[]' si tienes ese modelo
+  listarDetallesPorMedico(medicoId: number): Observable<any[]> {
+    const params = new HttpParams().set('medicoId', medicoId.toString());
+    // Asegúrate que el tipo de retorno <any[]> coincida con lo que devuelve el backend (CitaMedicoDTO)
+    return this.http.get<any[]>(`${this.apiUrl}/listarPorMedico/detalles`, { params });
+  }
   obtener(id: number): Observable<Cita> {
     return this.http.get<Cita>(`${this.apiUrl}/detalle/${id}`, { headers: this.getAuthHeaders() });
   }
@@ -44,4 +62,5 @@ export class CitaService {
   eliminar(id: number): Observable<void> {
     return this.http.delete<void>(`${this.apiUrl}/eliminar/${id}`, { headers: this.getAuthHeaders() });
   }
+  
 }

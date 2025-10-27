@@ -37,7 +37,17 @@ export class AuthService {
   isAuthenticated(): boolean {
     return !!this.getToken();
   }
+ getUsername(): string | null {
+    const token = this.getToken();
+    if (!token) return null;
 
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      return payload.sub;
+    } catch {
+      return null;
+    }
+  }
   getUserRoles(): string[] {
     const token = this.getToken();
     if (!token) return [];
@@ -58,4 +68,10 @@ isPaciente(): boolean {
   return this.getUserRoles().includes('ROLE_PACIENTE');
 }
 
+isMedico(): boolean {
+    return this.getUserRoles().includes('ROLE_MEDICO');
+  }
+
+
+    
 }
