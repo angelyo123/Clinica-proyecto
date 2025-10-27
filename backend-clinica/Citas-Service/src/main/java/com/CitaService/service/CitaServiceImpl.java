@@ -59,10 +59,28 @@ public class CitaServiceImpl implements CitaService {
     }
 
     @Override
-    public Cita actualizarEstado(Long id, String estado) {
-        Cita cita = citaRepository.findById(id).orElseThrow(() -> new RuntimeException("Cita no encontrada"));
+    public CitaDTO actualizarEstado(Long id, String estado) {
+        // 1. Encuentra la cita
+        Cita cita = citaRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Cita no encontrada"));
+
+        // 2. Actualiza el estado y guarda
         cita.setEstado(estado);
-        return citaRepository.save(cita);
+        Cita citaActualizada = citaRepository.save(cita);
+
+        // 3. Obtén los detalles del médico y paciente
+        Map<String, Object> medico = medicoClient.obtener(citaActualizada.getIdMedico());
+        Map<String, Object> paciente = pacienteClient.obtener(citaActualizada.getIdPaciente());
+
+        // 4. Construye y retorna el CitaDTO
+        CitaDTO dto = new CitaDTO();
+        dto.setId(citaActualizada.getId());
+        dto.setFechaHora(citaActualizada.getFechaHora());
+        dto.setEstado(citaActualizada.getEstado());
+        dto.setMedico(medico);
+        dto.setPaciente(paciente);
+
+        return dto;
     }
 
     @Override
@@ -96,5 +114,108 @@ public class CitaServiceImpl implements CitaService {
         }).collect(Collectors.toList());
     }
 
+    @Override
+    public List<CitaDTO> listarDetalles() {
+        List<Cita> citasDeLaBD = citaRepository.findAll();
 
+        return citasDeLaBD.stream()
+                .map(cita -> {
+                    CitaDTO dto = new CitaDTO();
+                    dto.setId(cita.getId());
+                    dto.setFechaHora(cita.getFechaHora());
+                    dto.setEstado(cita.getEstado());
+                    dto.setMedico(medicoClient.obtener(cita.getIdMedico()));
+                    dto.setPaciente(pacienteClient.obtener(cita.getIdPaciente()));
+                    return dto;
+                })
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public CitaDTO crearDetalle(CitaDTO dto) {
+        Cita nuevaCita = new Cita();
+        nuevaCita.setFechaHora(dto.getFechaHora());
+        nuevaCita.setEstado("PENDIENTE");
+
+        Long medicoId = ((Number) dto.getMedico().get("id")).longValue();
+        Long pacienteId = ((Number) dto.getPaciente().get("id")).longValue();
+
+        nuevaCita.setIdMedico(medicoId);
+        nuevaCita.setIdPaciente(pacienteId);
+
+        Map<String, Object> medico = medicoClient.obtener(medicoId);
+        Map<String, Object> paciente = pacienteClient.obtener(pacienteId);
+        if (paciente == null || medico == null) {
+            throw new IllegalArgumentException("Paciente o médico no válido");
+        }
+
+        Cita citaGuardada = citaRepository.save(nuevaCita);
+
+        dto.setId(citaGuardada.getId());
+        dto.setEstado(citaGuardada.getEstado());
+        dto.setMedico(medico);
+        dto.setPaciente(paciente);
+        return dto;
+    }
+
+    @Override
+    public CitaDTO actualizarDetalle(Long id, CitaDTO dto) {
+        Cita citaExistente = citaRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Cita no encontrada con id: " + id));
+
+        Long medicoId = ((Number) dto.getMedico().get("id")).longValue();
+        Long pacienteId = ((Number) dto.getPaciente().get("id")).longValue();
+
+        Map<String, Object> medico = medicoClient.obtener(medicoId);
+        Map<String, Object> paciente = pacienteClient.obtener(pacienteId);
+        if (paciente == null || medico == null) {
+            throw new IllegalArgumentException("Paciente o médico no válido");
+        }
+
+        citaExistente.setFechaHora(dto.getFechaHora());
+        citaExistente.setEstado(dto.getEstado());
+        citaExistente.setIdMedico(medicoId);
+        citaExistente.setIdPaciente(pacienteId);
+
+        citaRepository.save(citaExistente);
+
+        dto.setId(id);
+        dto.setMedico(medico);
+        dto.setPaciente(paciente);
+
+        return dto;
+    }
+
+    @Override
+    public List<CitaDTO> listarDetallesPorPaciente(Long pacienteId) {
+        List<Cita> citasDelPaciente = citaRepository.findByIdPaciente(pacienteId);
+
+        return citasDelPaciente.stream()
+                .map(cita -> {
+                    CitaDTO dto = new CitaDTO();
+                    dto.setId(cita.getId());
+                    dto.setFechaHora(cita.getFechaHora());
+                    dto.setEstado(cita.getEstado());
+                    dto.setMedico(medicoClient.obtener(cita.getIdMedico()));
+                    dto.setPaciente(pacienteClient.obtener(cita.getIdPaciente()));
+                    return dto;
+                })
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public List<CitaDTO> listarDetallesPorMedico(Long medicoId) {
+        List<Cita> citasDelMedico = citaRepository.findByIdMedico(medicoId);
+
+        return citasDelMedico.stream()
+                .map(cita -> {
+                    CitaDTO dto = new CitaDTO();
+                    dto.setId(cita.getId());
+                    dto.setFechaHora(cita.getFechaHora());
+                    dto.setEstado(cita.getEstado());
+                    dto.setPaciente(pacienteClient.obtener(cita.getIdPaciente()));
+                    return dto;
+                })
+                .collect(Collectors.toList());
+    }
 }

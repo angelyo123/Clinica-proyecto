@@ -22,7 +22,13 @@ export class CitaService {
   listar(): Observable<Cita[]> {
     return this.http.get<Cita[]>(`${this.apiUrl}/listar`, { headers: this.getAuthHeaders() });
   }
-
+actualizarEstado(id: number, estado: string): Observable<Cita> {
+  const params = new HttpParams().set('estado', estado);
+  return this.http.put<Cita>(`${this.apiUrl}/actualizarEstado/${id}`, null, {
+    params,
+    headers: this.getAuthHeaders()
+  });
+}
   listarDetalles(): Observable<Cita[]> {
     // Llama al nuevo endpoint que creaste en el backend
     return this.http.get<Cita[]>(`${this.apiUrl}/listar/detalles`, { headers: this.getAuthHeaders() });
@@ -56,4 +62,5 @@ export class CitaService {
   eliminar(id: number): Observable<void> {
     return this.http.delete<void>(`${this.apiUrl}/eliminar/${id}`, { headers: this.getAuthHeaders() });
   }
+  
 }

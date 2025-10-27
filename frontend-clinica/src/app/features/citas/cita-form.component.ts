@@ -10,38 +10,102 @@ import { Cita } from '../../core/models/cita.model';
   standalone: true,
   imports: [CommonModule, ReactiveFormsModule, RouterLink],
   template: `
-    <h2>{{ editMode ? 'Editar Cita' : 'Nueva Cita' }}</h2>
+   <div class="container mx-auto p-4 md:p-6 max-w-lg"> <h2 class="text-3xl font-semibold text-gray-800 mb-6 text-center">
+    {{ editMode ? 'Editar Cita' : 'Nueva Cita' }}
+  </h2>
 
-    <form *ngIf="rolCargado" [formGroup]="form" (ngSubmit)="guardar()">
-      <label>Fecha y Hora:</label>
-      <input type="datetime-local" formControlName="fechaHora" required />
+  <div *ngIf="!rolCargado" class="text-center text-gray-500 italic">
+    Cargando formulario...
+  </div>
 
-      <label>Estado:</label>
-      <input type="text" formControlName="estado" placeholder="Ej: Pendiente" required />
+  <form *ngIf="rolCargado" [formGroup]="form" (ngSubmit)="guardar()" class="space-y-6 bg-white p-8 rounded-lg shadow-md border border-gray-200">
 
-      <!-- Solo ADMIN ve estos campos -->
-      <ng-container *ngIf="esAdmin">
-        <label>ID Médico:</label>
-        <input type="number" formControlName="medicoId" />
-
-        <label>ID Paciente:</label>
-        <input type="number" formControlName="pacienteId" />
-      </ng-container>
-
-      <!-- Si no es admin (paciente), los IDs se manejan automáticamente -->
-      <ng-container *ngIf="!esAdmin">
-        <input type="hidden" formControlName="medicoId" />
-      </ng-container>
-
-      <div class="acciones">
-        <button type="submit" [disabled]="form.invalid">
-          {{ editMode ? 'Actualizar' : 'Guardar' }}
-        </button>
-        <button type="button" (click)="cancelar()">Cancelar</button>
+    <div>
+      <label for="fechaHora" class="block text-sm font-medium text-gray-700 mb-1">Fecha y Hora:</label>
+      <input
+        type="datetime-local"
+        id="fechaHora"
+        formControlName="fechaHora"
+        required
+        class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+        [ngClass]="{'border-red-500': form.get('fechaHora')?.invalid && form.get('fechaHora')?.touched}"
+      />
+      <div *ngIf="form.get('fechaHora')?.invalid && form.get('fechaHora')?.touched" class="mt-1 text-xs text-red-600">
+        La fecha y hora son requeridas.
       </div>
-    </form>
+    </div>
 
-    <p *ngIf="!rolCargado">Cargando formulario...</p>
+    <div>
+      <label for="estado" class="block text-sm font-medium text-gray-700 mb-1">Estado:</label>
+      <select
+        id="estado"
+        formControlName="estado"
+        required
+        class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm bg-white"
+        [ngClass]="{'border-red-500': form.get('estado')?.invalid && form.get('estado')?.touched}"
+      >
+        <option *ngFor="let e of estados" [value]="e">{{ e | titlecase }}</option>
+      </select>
+      <div *ngIf="form.get('estado')?.invalid && form.get('estado')?.touched" class="mt-1 text-xs text-red-600">
+        El estado es requerido.
+      </div>
+    </div>
+
+    <ng-container *ngIf="esAdmin">
+      <div>
+        <label for="medicoId" class="block text-sm font-medium text-gray-700 mb-1">ID Médico:</label>
+        <input
+          type="number"
+          id="medicoId"
+          formControlName="medicoId"
+          placeholder="Ingrese ID del médico"
+          class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+          [ngClass]="{'border-red-500': form.get('medicoId')?.invalid && form.get('medicoId')?.touched}"
+        />
+        <div *ngIf="form.get('medicoId')?.errors?.['required'] && form.get('medicoId')?.touched" class="mt-1 text-xs text-red-600">
+           El ID del médico es requerido.
+         </div>
+      </div>
+
+      <div>
+        <label for="pacienteId" class="block text-sm font-medium text-gray-700 mb-1">ID Paciente:</label>
+        <input
+          type="number"
+          id="pacienteId"
+          formControlName="pacienteId"
+          placeholder="Ingrese ID del paciente"
+          class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+          [ngClass]="{'border-red-500': form.get('pacienteId')?.invalid && form.get('pacienteId')?.touched}"
+        />
+         <div *ngIf="form.get('pacienteId')?.errors?.['required'] && form.get('pacienteId')?.touched" class="mt-1 text-xs text-red-600">
+           El ID del paciente es requerido.
+         </div>
+      </div>
+    </ng-container>
+
+    <input *ngIf="!esAdmin" type="hidden" formControlName="medicoId" />
+    <input *ngIf="!esAdmin" type="hidden" formControlName="pacienteId" />
+
+
+    <div class="flex items-center justify-end space-x-4 pt-4 border-t border-gray-200 mt-2">
+      <button
+        type="button"
+        (click)="cancelar()"
+        class="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition duration-150 ease-in-out"
+      >
+        Cancelar
+      </button>
+      <button
+        type="submit"
+        [disabled]="form.invalid || form.pristine"
+        class="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition duration-150 ease-in-out"
+      >
+        {{ editMode ? 'Actualizar Cita' : 'Guardar Cita' }}
+      </button>
+    </div>
+
+  </form>
+</div>
   `,
   styles: [`
     form { display: flex; flex-direction: column; max-width: 400px; gap: 10px; }
@@ -54,6 +118,7 @@ export class CitaFormComponent implements OnInit {
   id!: number;
   esAdmin = false;
   rolCargado = false;
+  estados: string[] = ['PENDIENTE', 'CONFIRMADA', 'CANCELADA', 'COMPLETADA'];
 
   constructor(
     private fb: FormBuilder,
@@ -66,14 +131,13 @@ export class CitaFormComponent implements OnInit {
   ngOnInit(): void {
     this.form = this.fb.group({
       fechaHora: ['', Validators.required],
-      estado: ['Pendiente', Validators.required],
+      estado: ['PENDIENTE', Validators.required],
       medicoId: [''],
       pacienteId: ['']
     });
 
     this.detectarRolUsuario();
 
-    // Modo edición
     const idParam = this.route.snapshot.paramMap.get('id');
     if (idParam) {
       this.editMode = true;
@@ -81,14 +145,13 @@ export class CitaFormComponent implements OnInit {
       this.citaService.obtener(this.id).subscribe(c => {
         this.form.patchValue({
           fechaHora: c.fechaHora,
-          estado: c.estado,
+          estado: (c.estado || 'PENDIENTE').toUpperCase(),
           medicoId: c.medico?.id,
           pacienteId: c.paciente?.id
         });
       });
     }
 
-    // Si viene ?medicoId=1 (paciente elige médico)
     const medicoIdParam = this.route.snapshot.queryParamMap.get('medicoId');
     if (medicoIdParam) {
       this.form.patchValue({ medicoId: +medicoIdParam });
@@ -106,25 +169,36 @@ export class CitaFormComponent implements OnInit {
         console.error('Error al leer roles del token:', e);
       }
     }
-
     this.rolCargado = true;
-    this.cdr.detectChanges(); // 🔁 fuerza la actualización del DOM
+    this.cdr.detectChanges();
   }
 
-
-  
   guardar(): void {
     if (this.form.invalid) return;
 
+    // Si es médico y está editando, usar endpoint específico de estado
+    if (this.editMode && !this.esAdmin) {
+      const nuevoEstado: string = this.form.value.estado;
+      this.citaService.actualizarEstado(this.id, nuevoEstado).subscribe({
+        next: () => {
+          alert('Estado actualizado correctamente');
+          this.router.navigate(['/citas']);
+        },
+        error: (err) => {
+          console.error('Error al actualizar estado:', err);
+          alert('Ocurrió un error al actualizar el estado');
+        }
+      });
+      return;
+    }
+
+    // Flujos admin (o creación)
     const cita: Cita = {
       fechaHora: this.form.value.fechaHora,
       estado: this.form.value.estado,
-      medico: { id: this.form.value.medicoId }
+      medico: this.form.value.medicoId ? { id: this.form.value.medicoId } : undefined,
+      paciente: this.form.value.pacienteId ? { id: this.form.value.pacienteId } : undefined
     };
-
-    if (this.esAdmin && this.form.value.pacienteId) {
-      cita.paciente = { id: this.form.value.pacienteId };
-    }
 
     const request = this.editMode
       ? this.citaService.actualizar(this.id, cita)
@@ -141,10 +215,6 @@ export class CitaFormComponent implements OnInit {
       }
     });
   }
-
-
-
-  
 
   cancelar(): void {
     this.router.navigate(['/citas']);
