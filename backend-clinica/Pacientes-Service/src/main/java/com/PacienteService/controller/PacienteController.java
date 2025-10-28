@@ -44,6 +44,18 @@ public class PacienteController {
         return pacienteService.Crear(paciente);
     }
 
+    @PutMapping("/actualizar/{id}")
+    public Paciente actualizar(@PathVariable Long id, @RequestBody Paciente paciente) {
+        return pacienteService.Actualizar(id, paciente);
+    }
+
+    @DeleteMapping("/eliminar/{id}")
+    public void eliminar(@PathVariable Long id) {
+        pacienteService.Eliminar(id);
+    }
+
+
+
     @GetMapping("/obtener/{id}")
     public Paciente obtener(@PathVariable Long id) {
         return pacienteService.ObtenerId(id);

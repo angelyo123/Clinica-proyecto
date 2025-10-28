@@ -6,8 +6,10 @@ import com.authservice.repository.RolRepository;
 import com.authservice.repository.UsuarioRepository;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.w3c.dom.stylesheets.LinkStyle;
 
 import java.util.Collections;
+import java.util.List;
 
 @Service
 public class UsuarioService {
@@ -23,6 +25,11 @@ public class UsuarioService {
         this.rolRepository = rolRepository;
         this.passwordEncoder = passwordEncoder;
     }
+
+    public List<Usuario> listarTodos() {
+        return usuarioRepository.findAll();
+    }
+
 
     public Usuario registrarPaciente(Usuario usuario) {
         Rol rolPaciente = rolRepository.findByNombre("ROLE_PACIENTE")

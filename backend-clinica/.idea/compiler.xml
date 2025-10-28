@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="CompilerConfiguration">
+    <annotationProcessing>
+      <profile default="true" name="Default" enabled="true" />
+      <profile name="Annotation profile for Automatizacion-Service" enabled="true">
+        <sourceOutputDir name="target/generated-sources/annotations" />
+        <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
+        <outputRelativeToContentRoot value="true" />
+        <processorPath useClasspath="false">
+          <entry name="$MAVEN_REPOSITORY$/org/projectlombok/lombok/1.18.40/lombok-1.18.40.jar" />
+        </processorPath>
+        <module name="Automatizacion-Service" />
+        <module name="Medicos-Service" />
+        <module name="auth-service" />
+        <module name="Citas-Service" />
+        <module name="Pacientes-Service" />
+        <module name="Horario-Service" />
+        <module name="backend-clinica" />
+      </profile>
+    </annotationProcessing>
+  </component>
+  <component name="JavacSettings">
+    <option name="ADDITIONAL_OPTIONS_OVERRIDE">
+      <module name="Automatizacion-Service" options="-parameters" />
+      <module name="Citas-Service" options="-parameters" />
+      <module name="Horario-Service" options="-parameters" />
+      <module name="Medicos-Service" options="-parameters" />
+      <module name="Pacientes-Service" options="-parameters" />
+      <module name="auth-service" options="-parameters" />
+      <module name="backend-clinica" options="-parameters" />
+    </option>
+  </component>
+</project>
