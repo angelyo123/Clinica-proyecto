@@ -7,7 +7,7 @@ import { Cita } from '../../core/models/cita.model';
   providedIn: 'root'
 })
 export class CitaService {
-  private apiUrl = 'http://localhost:8080/cita'; // ✅ correcto
+  private apiUrl = 'http://localhost:8081/cita'; // ✅ correcto
 
   constructor(private http: HttpClient) {}
 

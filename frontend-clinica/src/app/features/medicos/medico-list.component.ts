@@ -15,6 +15,30 @@ import { AuthService } from '../../core/services/auth.service';
     <!-- Mostrar botón solo si el usuario es ADMIN -->
     <button *ngIf="authService.isAdmin()" (click)="nuevoMedico()">+ Nuevo Médico</button>
 
+    <table border="1" style="margin-top: 10px; width: 100%; border-collapse: collapse;">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Nombre</th>
+          <th>especialidad</th>
+          <th>Teléfono</th>
+          <th>Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let p of medicos">
+          <td>{{ p.id }}</td>
+          <td>{{ p.nombre }}</td>
+          <td>{{ p.especialidad }}</td>
+          <td>{{ p.telefono }}</td>
+          <td>
+            <button [routerLink]="['/pacientes/editar', p.id]">Editar</button>
+            
+          </td>
+        </tr>
+      </tbody>
+    </table>
+
     <p *ngIf="error" class="text-danger">{{ error }}</p>
 
     <ul>
