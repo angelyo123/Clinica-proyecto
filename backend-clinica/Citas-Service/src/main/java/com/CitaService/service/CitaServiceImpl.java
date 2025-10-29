@@ -5,7 +5,6 @@ import com.CitaService.client.PacienteClient;
 import com.CitaService.model.Cita;
 import com.CitaService.model.CitaDTO;
 import com.CitaService.model.CitaMedicoDTO;
-import com.CitaService.repository.CitaDTORepository;
 import com.CitaService.repository.CitaRepository;
 import jakarta.transaction.Transactional;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -27,8 +26,6 @@ public class CitaServiceImpl implements CitaService {
 
     @Autowired
     private PacienteClient pacienteClient;
-    @Autowired
-    private CitaDTORepository citaDTORepository;
 
     @Override
     public List<Cita> listar() {
@@ -63,9 +60,27 @@ public class CitaServiceImpl implements CitaService {
 
     @Override
     public CitaDTO actualizarEstado(Long id, String estado) {
-        CitaDTO cita = citaDTORepository.findById(id).orElseThrow(() -> new RuntimeException("Cita no encontrada"));
+        // 1. Encuentra la cita
+        Cita cita = citaRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Cita no encontrada"));
+
+        // 2. Actualiza el estado y guarda
         cita.setEstado(estado);
-        return citaDTORepository.save(cita);
+        Cita citaActualizada = citaRepository.save(cita);
+
+        // 3. Obtén los detalles del médico y paciente
+        Map<String, Object> medico = medicoClient.obtener(citaActualizada.getIdMedico());
+        Map<String, Object> paciente = pacienteClient.obtener(citaActualizada.getIdPaciente());
+
+        // 4. Construye y retorna el CitaDTO
+        CitaDTO dto = new CitaDTO();
+        dto.setId(citaActualizada.getId());
+        dto.setFechaHora(citaActualizada.getFechaHora());
+        dto.setEstado(citaActualizada.getEstado());
+        dto.setMedico(medico);
+        dto.setPaciente(paciente);
+
+        return dto;
     }
 
     @Override
