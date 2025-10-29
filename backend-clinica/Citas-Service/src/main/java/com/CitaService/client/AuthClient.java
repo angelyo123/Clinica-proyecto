@@ -1,4 +1,4 @@
-package com.CitaService.client;
+/*package com.CitaService.client;
 
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -10,4 +10,4 @@ import java.util.Map;
 public interface AuthClient {
     @GetMapping("/validate")
     Map<String, Object> validateToken(@RequestHeader("Authorization") String token);
-}
+}*/

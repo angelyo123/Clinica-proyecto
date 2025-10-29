@@ -47,18 +47,25 @@ public class AuthController {
         return ResponseEntity.ok(new JwtResponse(token));
     }
 //quite el preauthority porq no me dejaba
+@PostMapping("/register/paciente")
+public ResponseEntity<Map<String, Object>> registerPaciente(@RequestBody Map<String, Object> request) {
+    String username = (String) request.get("username");
+    String password = (String) request.get("password");
 
-    @PostMapping("/register/paciente")
-    public ResponseEntity<Map<String, Object>> registerPaciente(@RequestBody Usuario usuario) {
-        Usuario nuevo = usuarioService.registrarPaciente(usuario);
+    // Crear Usuario temporal
+    Usuario usuario = new Usuario();
+    usuario.setUsername(username);
+    usuario.setPassword(password);
 
-        Map<String, Object> response = new HashMap<>();
-        response.put("id", nuevo.getId());
-        response.put("username", nuevo.getUsername());
-        response.put("mensaje", "Paciente registrado correctamente");
+    Usuario nuevo = usuarioService.registrarPaciente(usuario);
 
-        return ResponseEntity.ok(response);
-    }
+    // ✅ Retornar JSON
+    Map<String, Object> response = new HashMap<>();
+    response.put("usuarioId", nuevo.getId());
+    response.put("username", nuevo.getUsername());
+
+    return ResponseEntity.ok(response);
+}
 
     // ✅ REGISTRO MÉDICO
     @PostMapping("/register/medico")
