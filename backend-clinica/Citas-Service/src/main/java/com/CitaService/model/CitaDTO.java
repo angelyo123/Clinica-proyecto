@@ -10,6 +10,6 @@ public class CitaDTO {
     private Long id;
     private LocalDateTime fechaHora;
     private String estado;
-    private Map<String, Object> medico;
-    private Map<String, Object> paciente;
+    private MedicoDTO medico;
+    private PacienteDTO paciente;
 }

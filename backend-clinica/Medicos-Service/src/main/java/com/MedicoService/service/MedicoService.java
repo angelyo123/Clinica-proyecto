@@ -11,4 +11,5 @@ public interface MedicoService {
     Medico crear(Medico medico);
     Medico actualizar(Long id, Medico medico);
     void eliminar(Long id);
+    List<Medico> listarPorEspecialidad(String especialidad);
 }

@@ -48,4 +48,9 @@ public class MedicoController {
         return medicoService.listar();
     }
 
+    @GetMapping("/public/especialidad")
+    public List<Medico> listarPorEspecialidad(@RequestParam String especialidad) {
+        return medicoService.listarPorEspecialidad(especialidad);
+    }
+
 }

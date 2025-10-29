@@ -8,7 +8,7 @@ import java.util.List;
 import java.util.Map;
 
 
-@FeignClient(name = "horarios-service", url = "http://localhost:8084/horarios",
+@FeignClient(name = "horarios-service", url = "http://localhost:8085/horarios",
         configuration = com.AutomatizacionService.config.FeignConfig.class)
 public interface HorarioClient {
 

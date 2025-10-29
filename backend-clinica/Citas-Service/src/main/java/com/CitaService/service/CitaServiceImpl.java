@@ -2,9 +2,7 @@ package com.CitaService.service;
 
 import com.CitaService.client.MedicoClient;
 import com.CitaService.client.PacienteClient;
-import com.CitaService.model.Cita;
-import com.CitaService.model.CitaDTO;
-import com.CitaService.model.CitaMedicoDTO;
+import com.CitaService.model.*;
 import com.CitaService.repository.CitaRepository;
 import jakarta.transaction.Transactional;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -34,13 +32,30 @@ public class CitaServiceImpl implements CitaService {
 
     @Override
     public Cita crear(Cita cita) {
-        Map<String, Object> paciente = pacienteClient.obtener(cita.getIdPaciente());
-        Map<String, Object> medico = medicoClient.obtener(cita.getIdMedico());
-        if (paciente == null || medico == null) {
-            throw new IllegalArgumentException("Paciente o médico no válido");
+
+
+
+        try {
+            System.out.println("🧠 ID Paciente recibido: " + cita.getIdPaciente());
+            System.out.println("🧠 ID Médico recibido: " + cita.getIdMedico());
+
+            PacienteDTO paciente = pacienteClient.obtener(cita.getIdPaciente());
+            MedicoDTO medico = medicoClient.obtener(cita.getIdMedico());
+
+            System.out.println("✅ Paciente respuesta: " + paciente);
+            System.out.println("✅ Médico respuesta: " + medico);
+
+            if (paciente == null || medico == null) {
+                throw new IllegalArgumentException("Paciente o médico no válido");
+            }
+
+            cita.setEstado("PENDIENTE");
+            return citaRepository.save(cita);
+        } catch (Exception e) {
+            System.err.println("❌ Error al validar entidades externas: " + e.getMessage());
+            e.printStackTrace();
+            throw e;
         }
-        cita.setEstado("PENDIENTE");
-        return citaRepository.save(cita);
     }
 
     @Override
@@ -74,12 +89,15 @@ public class CitaServiceImpl implements CitaService {
     public CitaDTO obtenerDetalle(Long id) {
         Cita cita = citaRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Cita no encontrada"));
+
         CitaDTO dto = new CitaDTO();
         dto.setId(cita.getId());
         dto.setFechaHora(cita.getFechaHora());
         dto.setEstado(cita.getEstado());
+
         dto.setMedico(medicoClient.obtener(cita.getIdMedico()));
         dto.setPaciente(pacienteClient.obtener(cita.getIdPaciente()));
+
         return dto;
     }
 

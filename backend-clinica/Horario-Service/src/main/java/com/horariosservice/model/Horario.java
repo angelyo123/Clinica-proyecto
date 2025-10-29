@@ -27,4 +27,6 @@ public class Horario {
     private LocalTime horaInicio;
     private LocalTime horaFin;
     private boolean disponible = true;
+    private int pacientesPorHora = 1;
+
 }

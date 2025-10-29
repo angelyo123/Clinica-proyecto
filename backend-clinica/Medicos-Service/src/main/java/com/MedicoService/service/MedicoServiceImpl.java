@@ -62,4 +62,22 @@ public class MedicoServiceImpl implements MedicoService {
     public void eliminar(Long id) {
         medicoRepository.deleteById(id);
     }
+
+    @Override
+    public List<Medico> listarPorEspecialidad(String especialidad) {
+        String normalizado = java.text.Normalizer.normalize(especialidad, java.text.Normalizer.Form.NFD)
+                .replaceAll("[\\p{InCombiningDiacriticalMarks}]", "")
+                .toLowerCase();
+
+        return medicoRepository.findAll().stream()
+                .filter(m -> {
+                    String esp = java.text.Normalizer.normalize(m.getEspecialidad(), java.text.Normalizer.Form.NFD)
+                            .replaceAll("[\\p{InCombiningDiacriticalMarks}]", "")
+                            .toLowerCase();
+                    return esp.equals(normalizado);
+                })
+                .toList();
+    }
+
+
 }
