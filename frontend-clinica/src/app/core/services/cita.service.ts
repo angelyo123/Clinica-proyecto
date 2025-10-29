@@ -33,6 +33,13 @@ actualizarEstado(id: number, estado: string): Observable<Cita> {
     // Llama al nuevo endpoint que creaste en el backend
     return this.http.get<Cita[]>(`${this.apiUrl}/listar/detalles`, { headers: this.getAuthHeaders() });
   }
+  listarPorPaciente(pacienteId: number): Observable<Cita[]> {
+    const params = new HttpParams().set('pacienteId', pacienteId.toString());
+    return this.http.get<Cita[]>(`${this.apiUrl}/listarPorPaciente`, { 
+      params,
+      headers: this.getAuthHeaders() // ✅ Añadido
+    });
+  }
 // --- NUEVO MÉTODO PARA PACIENTE ---
   listarDetallesPorPaciente(pacienteId: number): Observable<Cita[]> {
     const params = new HttpParams().set('pacienteId', pacienteId.toString());

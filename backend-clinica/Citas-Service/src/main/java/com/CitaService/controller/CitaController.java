@@ -13,7 +13,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/cita")
-@PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_MEDICO','ROLE_PACIENTE')")
+//@PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_MEDICO','ROLE_PACIENTE')")
 public class CitaController {
 
     @Autowired
@@ -57,6 +57,12 @@ public class CitaController {
     @GetMapping("/detalle/{id}")
     public ResponseEntity<CitaDTO> obtenerDetalle(@PathVariable Long id) {
         return ResponseEntity.ok(citaService.obtenerDetalle(id));
+    }
+    @DeleteMapping("/paciente/{idPaciente}")
+    public ResponseEntity<Void> eliminarPorPaciente(@PathVariable Long idPaciente) {
+        System.out.println("📋 DELETE /cita/paciente/" + idPaciente);
+        citaService.eliminarPorPaciente(idPaciente);
+        return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/detallePorMedico")

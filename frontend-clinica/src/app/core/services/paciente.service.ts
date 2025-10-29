@@ -35,9 +35,11 @@ export class PacienteService {
         return this.http.put<Paciente>(`${this.apiUrl}/actualizar/${id}`, paciente);
     }
 
-    eliminar(id:number):Observable<void>{
-        return this.http.delete<void>(`${this.apiUrl}/eliminar/${id}`);
-    }
+    eliminar(id: number): Observable<void> {
+  return this.http.delete<void>(`${this.apiUrl}/eliminar/${id}`, { 
+    headers: this.getAuthHeaders()  // ✅ Envía token al PacienteService
+  });
+}
        obtenerPerfil(): Observable<Paciente> {
         return this.http.get<Paciente>(`${this.apiUrl}/perfil`, { 
             headers: this.getAuthHeaders() 

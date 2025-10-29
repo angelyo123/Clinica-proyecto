@@ -3,6 +3,7 @@ package com.PacienteService.controller;
 import com.PacienteService.client.AutomatizacionClient;
 import com.PacienteService.client.CitaClient;
 import com.PacienteService.client.MedicoClient;
+import com.PacienteService.model.CitaDTO;
 import com.PacienteService.model.Paciente;
 
 import com.PacienteService.model.PacienteBasicoDTO;
@@ -19,7 +20,7 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/paciente")
-//@PreAuthorize("hasAnyAuthority('ROLE_PACIENTE', 'ROLE_ADMIN', 'ROLE_MEDICO')")
+@PreAuthorize("hasAnyAuthority('ROLE_PACIENTE', 'ROLE_ADMIN', 'ROLE_MEDICO')")
 public class PacienteController {
 
     @Autowired
@@ -68,8 +69,8 @@ public class PacienteController {
     }
 
     @GetMapping("/citas")
-    public List<Map<String, Object>> listarCitasPorPaciente(@RequestParam Long pacienteId) {
-        return citaClient.listarPorPaciente(pacienteId);
+    public List<CitaDTO> listarCitasPorPaciente(@RequestParam Long pacienteId) {
+        return citaClient.listarDetallesPorPaciente(pacienteId);
     }
 
     @PostMapping("/citas")

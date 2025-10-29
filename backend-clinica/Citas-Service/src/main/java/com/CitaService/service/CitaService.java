@@ -14,6 +14,7 @@ public interface CitaService {
     List<Cita> listarPorMedico(Long idMedico);
     CitaDTO actualizarEstado(Long id, String estado);
     void eliminar(Long id);
+    void eliminarPorPaciente(Long idPaciente);
 
     CitaDTO obtenerDetalle(Long id);
     List<CitaMedicoDTO> listarCitasPorMedicoConPacientes(Long medicoId);

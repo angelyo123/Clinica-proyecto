@@ -59,6 +59,7 @@ public class SecurityConfig {
             // 🔒 Producción: seguridad con roles
             http.authorizeHttpRequests(auth -> auth
                             .requestMatchers("/auth/**").permitAll()
+                            .requestMatchers("/cita/paciente/**").permitAll()
                             .requestMatchers("/admin/**").hasAuthority("ROLE_ADMIN")
                             .requestMatchers("/medico/**").hasAuthority("ROLE_MEDICO")
                             .requestMatchers("/paciente/**").hasAuthority("ROLE_PACIENTE")

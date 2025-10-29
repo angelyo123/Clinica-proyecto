@@ -87,6 +87,13 @@ public class CitaServiceImpl implements CitaService {
     public void eliminar(Long id) {
         citaRepository.deleteById(id);
     }
+    @Override
+    @Transactional
+    public void eliminarPorPaciente(Long idPaciente) {
+        System.out.println("🗑️ Eliminando todas las citas del paciente ID: " + idPaciente);
+        citaRepository.deleteByIdPaciente(idPaciente);
+        System.out.println("✅ Citas eliminadas");
+    }
 
     @Override
     public CitaDTO obtenerDetalle(Long id) {

@@ -2,6 +2,8 @@ package com.PacienteService.service;
 
 
 import com.PacienteService.client.AuthClient;
+import com.PacienteService.client.CitaClient;
+import com.PacienteService.model.CitaDTO;
 import com.PacienteService.model.Paciente;
 import com.PacienteService.repository.PacienteRepository;
 import com.PacienteService.service.PacienteService;
@@ -22,6 +24,9 @@ public class PacienteServiceImpl implements PacienteService {
 
     @Autowired
     private AuthClient authClient;
+
+    @Autowired
+    private CitaClient citaClient;
 
     @Override
     public List<Paciente> listar() {
@@ -61,9 +66,24 @@ public class PacienteServiceImpl implements PacienteService {
 
     @Override
     public void Eliminar(Long id) {
-        pacienteRepository.deleteById(id);
-    }
+        System.out.println("🗑️ Eliminando paciente ID: " + id);
 
+        try {
+            // 1️⃣ Eliminar todas las citas del paciente (una sola llamada)
+            System.out.println("📋 Eliminando citas asociadas...");
+            citaClient.eliminarPorPaciente(id);
+            System.out.println("✅ Citas eliminadas");
+
+            // 2️⃣ Eliminar el paciente
+            System.out.println("📋 Eliminando paciente...");
+            pacienteRepository.deleteById(id);
+            System.out.println("✅ Paciente eliminado");
+
+        } catch (Exception e) {
+            System.err.println("❌ Error: " + e.getMessage());
+            throw new RuntimeException("Error al eliminar paciente", e);
+        }
+    }
     @Override
     public Paciente guardarPaciente(Paciente paciente) {
         return pacienteRepository.save(paciente);
