@@ -33,14 +33,12 @@ public class MedicoServiceImpl implements MedicoService {
 
     @Override
     public Medico crear(Medico medico) {
-        // Paso 1: Crear usuario en auth-service
         Map<String, Object> request = new HashMap<>();
         request.put("username", medico.getDni());
         request.put("password", "1234");
 
         Map<String, Object> response = authClient.registrarUsuarioMedico(request);
 
-        // Paso 2: Guardar médico con el username del auth-service
         medico.setUsuario(response.get("username").toString());
         return medicoRepository.save(medico);
     }
@@ -61,5 +59,11 @@ public class MedicoServiceImpl implements MedicoService {
     @Override
     public void eliminar(Long id) {
         medicoRepository.deleteById(id);
+    }
+
+    @Override
+    public Medico obtenerPorUsuario(String username) {
+        return medicoRepository.findByUsuario(username)
+                .orElseThrow(() -> new RuntimeException("Médico no encontrado con username: " + username));
     }
 }

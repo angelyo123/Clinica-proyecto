@@ -12,9 +12,14 @@ public interface CitaService {
     Cita obtener(Long id);
     List<Cita> listarPorPaciente(Long idPaciente);
     List<Cita> listarPorMedico(Long idMedico);
-    Cita actualizarEstado(Long id, String estado);
+    CitaDTO actualizarEstado(Long id, String estado);
     void eliminar(Long id);
 
     CitaDTO obtenerDetalle(Long id);
     List<CitaMedicoDTO> listarCitasPorMedicoConPacientes(Long medicoId);
+    List<CitaDTO> listarDetalles();
+    CitaDTO crearDetalle(CitaDTO citaDTO);
+    CitaDTO actualizarDetalle(Long id, CitaDTO citaDTO);
+    List<CitaDTO> listarDetallesPorPaciente(Long pacienteId);
+    List<CitaDTO> listarDetallesPorMedico(Long medicoId); //
 }
