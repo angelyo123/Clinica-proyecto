@@ -1,5 +1,6 @@
 package com.PacienteService.controller;
 
+import com.PacienteService.client.AutomatizacionClient;
 import com.PacienteService.client.CitaClient;
 import com.PacienteService.client.MedicoClient;
 import com.PacienteService.model.Paciente;
@@ -7,20 +8,18 @@ import com.PacienteService.model.Paciente;
 import com.PacienteService.model.PacienteBasicoDTO;
 import com.PacienteService.service.PacienteService;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.client.RestTemplate;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 import java.util.Map;
 
 @RestController
 @RequestMapping("/paciente")
-@PreAuthorize("hasAnyAuthority('ROLE_PACIENTE', 'ROLE_ADMIN', 'ROLE_MEDICO')")
+//@PreAuthorize("hasAnyAuthority('ROLE_PACIENTE', 'ROLE_ADMIN', 'ROLE_MEDICO')")
 public class PacienteController {
 
     @Autowired
@@ -31,6 +30,8 @@ public class PacienteController {
 
     @Autowired
     private CitaClient citaClient;
+    @Autowired
+    private AutomatizacionClient automatizacionClient;
 
     // ✅ CRUD básico de pacientes
     @GetMapping("/listar")
@@ -39,10 +40,21 @@ public class PacienteController {
     }
 
     @PostMapping("/crear")
-    @PreAuthorize("permitAll()")
     public Paciente crear(@RequestBody Paciente paciente) {
         return pacienteService.Crear(paciente);
     }
+
+    @PutMapping("/actualizar/{id}")
+    public Paciente actualizar(@PathVariable Long id, @RequestBody Paciente paciente) {
+        return pacienteService.Actualizar(id, paciente);
+    }
+
+    @DeleteMapping("/eliminar/{id}")
+    public void eliminar(@PathVariable Long id) {
+        pacienteService.Eliminar(id);
+    }
+
+
 
     @GetMapping("/obtener/{id}")
     public Paciente obtener(@PathVariable Long id) {
@@ -77,6 +89,23 @@ public class PacienteController {
     public PacienteBasicoDTO obtenerPublico(@PathVariable Long id) {
         Paciente p = pacienteService.ObtenerId(id);
         return new PacienteBasicoDTO(p.getId(), p.getNombre(), p.getTelefono());
+    }
+
+    @PostMapping("/ia/solicitud")
+    @PreAuthorize("hasAuthority('ROLE_PACIENTE')")
+    public ResponseEntity<?> solicitarIA(@RequestBody Map<String, String> body) {
+        String mensaje = body.get("mensaje");
+        Long pacienteId = Long.valueOf(body.get("pacienteId"));
+
+        Map<String, Object> solicitud = Map.of(
+                "pacienteId", pacienteId,
+                "mensaje", mensaje
+        );
+
+        // 🔹 Llamamos al microservicio de Automatización
+        Map<String, Object> respuesta = automatizacionClient.enviarSolicitudIA(solicitud);
+
+        return ResponseEntity.ok(respuesta);
     }
 
 }

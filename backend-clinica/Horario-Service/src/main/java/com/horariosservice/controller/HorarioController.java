@@ -19,14 +19,14 @@ public class HorarioController {
 
     // ✅ Listar todos los horarios
     @GetMapping
-    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_MEDICO')")
+    //@PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_MEDICO')")
     public ResponseEntity<List<Horario>> listar() {
         return ResponseEntity.ok(horarioService.listar());
     }
 
     // ✅ Obtener un horario por ID
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_MEDICO')")
+    //@PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_MEDICO')")
     public ResponseEntity<Horario> obtener(@PathVariable Long id) {
         Horario horario = horarioService.obtener(id);
         if (horario == null) {
@@ -37,7 +37,7 @@ public class HorarioController {
 
     // ✅ Crear un nuevo horario (solo médicos o admin)
     @PostMapping
-    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_MEDICO')")
+    //@PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_MEDICO')")
     public ResponseEntity<Horario> crear(@RequestBody Horario horario) {
         Horario nuevo = horarioService.crear(horario);
         return ResponseEntity.ok(nuevo);
@@ -45,7 +45,7 @@ public class HorarioController {
 
     // ✅ Actualizar horario existente
     @PutMapping("/{id}")
-    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_MEDICO')")
+    //@PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_MEDICO')")
     public ResponseEntity<Horario> actualizar(@PathVariable Long id, @RequestBody Horario horario) {
         Horario actualizado = horarioService.actualizar(id, horario);
         if (actualizado == null) {
@@ -56,14 +56,14 @@ public class HorarioController {
 
     // ✅ Eliminar horario
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_MEDICO')")
+    //@PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_MEDICO')")
     public ResponseEntity<Void> eliminar(@PathVariable Long id) {
         horarioService.eliminar(id);
         return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/medico/{id}")
-    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_MEDICO')")
+    //@PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_MEDICO')")
     public ResponseEntity<List<Horario>> listarPorMedico(@PathVariable Long id) {
         return ResponseEntity.ok(horarioService.listarPorMedico(id));
     }
