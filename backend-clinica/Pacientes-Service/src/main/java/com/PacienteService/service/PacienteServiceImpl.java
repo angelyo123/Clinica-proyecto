@@ -33,17 +33,14 @@ public class PacienteServiceImpl implements PacienteService {
         return pacienteRepository.findById(id).orElse(null);
     }
 
-    @Override
     public Paciente Crear(Paciente paciente) {
-        // 🔹 Paso 1: Crear usuario en el auth-service
-        Map<String, Object> request = new HashMap<>();
-        request.put("username", paciente.getDni());
-        request.put("password", "1234");
 
-        Map<String, Object> response = authClient.registrarUsuarioPaciente(request);
 
-        // 🔹 Paso 2: Guardar paciente (guardamos solo username del usuario)
-        paciente.setUsuario(response.get("username").toString());
+        if (paciente.getUsuario() == null) {
+
+            paciente.setUsuario(paciente.getDni());
+        }
+
         return pacienteRepository.save(paciente);
     }
 
@@ -66,6 +63,7 @@ public class PacienteServiceImpl implements PacienteService {
 
     @Override
     public Paciente guardarPaciente(Paciente paciente) {
+
         return pacienteRepository.save(paciente);
     }
 

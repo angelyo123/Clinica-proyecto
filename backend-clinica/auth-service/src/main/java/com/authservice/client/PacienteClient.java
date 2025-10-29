@@ -1,7 +1,10 @@
 package com.authservice.client;
 
+import com.authservice.model.PacienteDatosDTO;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 
 import java.util.List;
 
@@ -9,4 +12,8 @@ import java.util.List;
 public interface PacienteClient {
     @GetMapping("/paciente/listar")
     List<Object> listarPacientes();
+
+    @PostMapping("/paciente/crear")
+    PacienteDatosDTO crearPaciente(@RequestBody PacienteDatosDTO datosPaciente);
+
 }

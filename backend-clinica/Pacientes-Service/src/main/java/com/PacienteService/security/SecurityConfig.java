@@ -41,6 +41,7 @@ public class SecurityConfig {
         } else {
             // 🔒 Modo producción: seguridad normal
             http.authorizeHttpRequests(auth -> auth
+                            .requestMatchers("/paciente/crear").permitAll()
                             .requestMatchers("/public/**").permitAll()
                             .anyRequest().authenticated()
                     )
