@@ -4,10 +4,12 @@ package com.authservice.controller.protect;
 import com.authservice.model.Rol;
 import com.authservice.model.Usuario;
 import com.authservice.repository.RolRepository;
+import com.authservice.repository.UsuarioRepository;
 import com.authservice.security.JwtUtil;
 import com.authservice.model.login.JwtResponse;
 import com.authservice.model.login.LoginRequest;
 import com.authservice.service.UsuarioService;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.http.ResponseEntity;
@@ -29,6 +31,9 @@ public class AuthController {
     private final JwtUtil jwtUtil;
     private final UsuarioService usuarioService;
 
+    @Autowired
+    private UsuarioRepository usuarioRepository;
+
     public AuthController(AuthenticationManager authenticationManager,
                           JwtUtil jwtUtil,
                           UsuarioService usuarioService) {
@@ -40,13 +45,22 @@ public class AuthController {
     // ✅ LOGIN
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody LoginRequest request) {
+        // Autenticar al usuario con Spring Security
         Authentication authentication = authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(request.getUsername(), request.getPassword())
         );
-        String token = jwtUtil.generateToken(authentication);
+
+        // Obtener el usuario desde la base de datos
+        Usuario usuario = usuarioRepository.findByUsername(request.getUsername())
+                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+
+        // Generar token con ID y roles
+        String token = jwtUtil.generateToken(authentication, usuario.getId());
+
         return ResponseEntity.ok(new JwtResponse(token));
     }
-//quite el preauthority porq no me dejaba
+
+    //quite el preauthority porq no me dejaba
 @PostMapping("/register/paciente")
 public ResponseEntity<Map<String, Object>> registerPaciente(@RequestBody Map<String, Object> request) {
     String username = (String) request.get("username");
@@ -83,6 +97,21 @@ public ResponseEntity<Map<String, Object>> registerPaciente(@RequestBody Map<Str
         response.put("usuarioId", nuevo.getId());
         response.put("username", nuevo.getUsername());
 
+        return ResponseEntity.ok(response);
+    }
+
+
+    @PostMapping("/register/admin")
+    public ResponseEntity<Map<String, Object>> registrarAdmin(@RequestBody Map<String, Object> request) {
+        Usuario usuario = new Usuario();
+        usuario.setUsername(request.get("username").toString());
+        usuario.setPassword(request.get("password").toString());
+        Usuario nuevo = usuarioService.registrarAdmin(usuario);
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("id", nuevo.getId());
+        response.put("username", nuevo.getUsername());
+        response.put("roles", nuevo.getRoles());
         return ResponseEntity.ok(response);
     }
 

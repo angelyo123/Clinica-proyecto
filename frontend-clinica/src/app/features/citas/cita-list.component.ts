@@ -1,6 +1,6 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { RouterLink } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { CitaService } from '../../core/services/cita.service';
 import { PacienteService } from '../../core/services/paciente.service';
 import { MedicoService } from '../../core/services/medico.service';
@@ -16,13 +16,25 @@ import { FormsModule } from '@angular/forms';
   imports: [CommonModule, RouterLink, FormsModule],
   template: `
     <div class="container mx-auto px-4 py-8 max-w-7xl">
+
+
       <div class="flex justify-between items-center mb-6">
-        <h2 class="text-3xl font-bold text-gray-800">📋 Listado de Citas</h2>
-        <button *ngIf="esAdmin" routerLink="/citas/nueva"
-                class="bg-green-500 hover:bg-green-600 text-white font-semibold px-6 py-2.5 rounded-lg shadow-md transition duration-300 ease-in-out transform hover:scale-105">
-          ➕ Nueva Cita
-        </button>
-      </div>
+  <h2 class="text-3xl font-bold text-gray-800">📋 Listado de Citas</h2>
+
+  <div class="flex gap-3">
+    <button *ngIf="esAdmin" routerLink="/citas/nueva"
+            class="bg-green-500 hover:bg-green-600 text-white font-semibold px-6 py-2.5 rounded-lg shadow-md transition duration-300 ease-in-out transform hover:scale-105">
+      ➕ Nueva Cita
+    </button>
+
+    <button *ngIf="esMedico || esAdmin"
+            (click)="irAHorarios()"
+            class="bg-blue-500 hover:bg-blue-600 text-white font-semibold px-6 py-2.5 rounded-lg shadow-md transition duration-300 ease-in-out transform hover:scale-105">
+      📅 Administrar Horario
+    </button>
+  </div>
+</div>
+
 
       <div *ngIf="pacienteLogueado" class="bg-green-50 border-l-4 border-green-500 p-4 mb-6 rounded-lg shadow-sm">
         <div class="flex items-center">
@@ -161,7 +173,8 @@ export class CitaListComponent implements OnInit {
     private citaService: CitaService,
     private pacienteService: PacienteService,
     private medicoService: MedicoService,
-    private authService: AuthService
+    private authService: AuthService,
+    private router: Router
   ) {}
 
   ngOnInit(): void {
@@ -219,6 +232,14 @@ export class CitaListComponent implements OnInit {
     }
   }
 
+  irAHorarios(): void {
+  if (this.esAdmin) {
+    this.router.navigate(['/horarios']);
+  } else if (this.esMedico) {
+    this.router.navigate(['/mis-horarios']);
+  }
+}
+
   private syncEstadosUI(): void {
     for (const c of this.citas) {
       if (c.id != null) {
@@ -271,4 +292,6 @@ export class CitaListComponent implements OnInit {
   normalizeEstado(e: string | null | undefined): string {
     return (e ?? '').trim().toUpperCase();
   }
+
+
 }

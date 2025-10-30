@@ -7,49 +7,56 @@ import { Medico } from '../models/medico.model';
   providedIn: 'root'
 })
 export class MedicoService {
-  private apiUrl = 'http://localhost:8083/medico';
 
-  constructor(private http:HttpClient){
-  }
+  private readonly apiUrl = 'http://localhost:8083/medico';
+
+  constructor(private http: HttpClient) {}
+
   private getAuthHeaders(): HttpHeaders {
-        const token = localStorage.getItem('token');
-        return new HttpHeaders({
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-        });
-    }
-  listar():Observable<Medico[]>{
-    return this.http.get<Medico[]>(`${this.apiUrl}/listar`);
+    const token = localStorage.getItem('token');
+    return new HttpHeaders({
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json'
+    });
   }
 
-  crear(medico:Medico):Observable<Medico>{
-    return this.http.post<Medico>(`${this.apiUrl}/crear`, medico);
+  listar(): Observable<Medico[]> {
+    return this.http.get<Medico[]>(`${this.apiUrl}/listar`, {
+      headers: this.getAuthHeaders()
+    });
   }
 
-  obtener(id:number):Observable<Medico>{
-    return this.http.get<Medico>(`${this.apiUrl}/${id}`)
+  obtener(id: number): Observable<Medico> {
+    return this.http.get<Medico>(`${this.apiUrl}/obtener/${id}`, {
+      headers: this.getAuthHeaders()
+    });
+  }
+
+  crear(medico: Medico): Observable<Medico> {
+    return this.http.post<Medico>(`${this.apiUrl}/crear`, medico, {
+      headers: this.getAuthHeaders()
+    });
   }
 
   actualizar(id: number, medico: Medico): Observable<Medico> {
-    return this.http.put<Medico>(`${this.apiUrl}/actualizar/${id}`, medico);
+    return this.http.put<Medico>(`${this.apiUrl}/actualizar/${id}`, medico, {
+      headers: this.getAuthHeaders()
+    });
   }
 
   eliminar(id: number): Observable<void> {
-    return this.http.delete<void>(`${this.apiUrl}/eliminar/${id}`);
+    return this.http.delete<void>(`${this.apiUrl}/eliminar/${id}`, {
+      headers: this.getAuthHeaders()
+    });
   }
 
+  obtenerPerfil(): Observable<Medico> {
+    return this.http.get<Medico>(`${this.apiUrl}/perfil`, {
+      headers: this.getAuthHeaders()
+    });
+  }
 
-  listarAdmin() {
-  return this.http.get<Medico[]>('http://localhost:8081/admin/medicos/listar');
-}
-
-listarPublico() {
-  return this.http.get<Medico[]>('http://localhost:8081/paciente/medicos');
-}
-
-obtenerPerfil(): Observable<Medico> {
-        return this.http.get<Medico>(`${this.apiUrl}/perfil`, { 
-            headers: this.getAuthHeaders() 
-        });
-    }
+  listarPublico(): Observable<Medico[]> {
+    return this.http.get<Medico[]>(`${this.apiUrl}/public/listar`);
+  }
 }

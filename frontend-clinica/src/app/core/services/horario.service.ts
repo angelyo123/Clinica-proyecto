@@ -28,7 +28,7 @@ export class HorarioService {
   }
 
   crear(horario: Horario): Observable<Horario> {
-    return this.http.post<Horario>(this.apiUrl, horario, { headers: this.getAuthHeaders() });
+    return this.http.post<Horario>(`${this.apiUrl}/crear`, horario, { headers: this.getAuthHeaders() });
   }
 
   actualizar(id: number, horario: Horario): Observable<Horario> {
@@ -42,4 +42,11 @@ export class HorarioService {
   listarPorMedico(medicoId: number): Observable<Horario[]> {
     return this.http.get<Horario[]>(`${this.apiUrl}/medico/${medicoId}`, { headers: this.getAuthHeaders() });
   }
+
+  listarMios(): Observable<Horario[]> {
+  return this.http.get<Horario[]>(`${this.apiUrl}/mios`, {
+    headers: this.getAuthHeaders()
+  });
+}
+
 }

@@ -18,5 +18,9 @@ export const routes: Routes = [
   { path: 'medicos', canActivate: [AuthGuard], children: MEDICOS_ROUTES },
   { path: 'pacientes', canActivate: [AuthGuard], children: PACIENTES_ROUTES },
   { path: 'citas', canActivate: [AuthGuard], children: CITA_ROUTES },
-  { path: 'horarios', canActivate: [AuthGuard], children: HORARIO_ROUTES }
+  { path: 'horarios', canActivate: [AuthGuard], children: HORARIO_ROUTES },
+
+  { path: 'mis-citas', canActivate: [AuthGuard], loadComponent: () => import('./features/citas/cita-list.component').then(m => m.CitaListComponent) },
+{ path: 'mis-horarios', canActivate: [AuthGuard], loadComponent: () => import('./features/horarios/horario-list.component').then(m => m.HorarioListComponent) },
+
 ];

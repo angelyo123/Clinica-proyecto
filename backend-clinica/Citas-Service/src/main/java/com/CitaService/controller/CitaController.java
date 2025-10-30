@@ -40,8 +40,9 @@ public class CitaController {
     }
 
     @GetMapping("/listarPorMedico")
-    public List<Cita> listarPorMedico(@RequestParam Long medicoId) {
-        return citaService.listarPorMedico(medicoId);
+    public ResponseEntity<List<Cita>> listarPorMedico(@RequestParam Long medicoId) {
+        List<Cita> citas = citaService.listarPorMedico(medicoId);
+        return ResponseEntity.ok(citas);
     }
 
     @PutMapping("/actualizarEstado/{id}")

@@ -66,4 +66,5 @@ public class MedicoServiceImpl implements MedicoService {
         return medicoRepository.findByUsuario(username)
                 .orElseThrow(() -> new RuntimeException("Médico no encontrado con username: " + username));
     }
+
 }

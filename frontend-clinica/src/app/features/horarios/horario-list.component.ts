@@ -1,6 +1,6 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { RouterLink } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { HorarioService } from '../../core/services/horario.service';
 import { Horario } from '../../core/models/horario.model';
@@ -14,17 +14,31 @@ import { AuthService } from '../../core/services/auth.service';
     <div class="p-6">
       <!-- Header -->
       <div class="flex flex-col md:flex-row md:justify-between md:items-center mb-6 gap-3">
-        <h2 class="text-2xl font-bold text-gray-800">Gestión de Horarios</h2>
+      <h2 class="text-2xl font-bold text-gray-800">
+        {{ esMedico ? 'Mis Horarios' : 'Gestión de Horarios' }}
+      </h2>
 
-        <!-- Solo ADMIN puede crear -->
-        <a
-          *ngIf="esAdmin"
+      <div class="flex gap-2">
+        <a *ngIf="esMedico"
+          routerLink="/mis-citas"
+          class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg shadow transition">
+          ← Volver a Mis Citas
+        </a>
+
+        <a *ngIf="esAdmin || esMedico"
           routerLink="/horarios/nuevo"
-          class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg shadow transition"
-        >
+          class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg shadow transition">
           ➕ Nuevo Horario
         </a>
+
+        <!-- Botón para volver a citas -->
+    <button *ngIf="esMedico || esAdmin"
+            (click)="irACitas()"
+            class="bg-blue-500 hover:bg-blue-600 text-white font-semibold px-6 py-2.5 rounded-lg shadow-md transition duration-300 ease-in-out transform hover:scale-105">
+      📋 Ver Citas
+    </button>
       </div>
+</div>
 
       <!-- Filtros -->
       <div class="bg-gray-50 p-4 rounded-lg shadow mb-4 flex flex-col md:flex-row gap-4">
@@ -76,7 +90,8 @@ import { AuthService } from '../../core/services/auth.service';
               <th class="py-3 px-4 border-b">Inicio</th>
               <th class="py-3 px-4 border-b">Fin</th>
               <th class="py-3 px-4 border-b">Disponible</th>
-              <th *ngIf="esAdmin" class="py-3 px-4 border-b text-center">Acciones</th>
+              <th *ngIf="esAdmin || esMedico" class="py-3 px-4 border-b text-center">Acciones</th>
+
             </tr>
           </thead>
 
@@ -99,7 +114,11 @@ import { AuthService } from '../../core/services/auth.service';
                 </span>
               </td>
 
-              <td *ngIf="esAdmin" class="py-2 px-4 text-center flex justify-center gap-3">
+              <td
+              *ngIf="esAdmin || (esMedico && h.medicoId === idMedicoLogueado)"
+              class="py-2 px-4 text-center flex justify-center gap-3"
+            >
+
   <!-- Botón Editar -->
   <a
     [routerLink]="['/horarios/editar', h.id]"
@@ -184,12 +203,12 @@ export class HorarioListComponent implements OnInit {
   horarios: Horario[] = [];
   horariosFiltrados: Horario[] = [];
   dias = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
-
   filtroMedicoId: number | null = null;
   filtroDia: string = '';
-
   esAdmin = false;
 
+  esMedico = false;
+  idMedicoLogueado: number | null = null;
   // paginación
   paginaActual = 1;
   filasPorPagina = 5;
@@ -200,19 +219,15 @@ export class HorarioListComponent implements OnInit {
 
   constructor(
     private horarioService: HorarioService,
-    private authService: AuthService
+    private authService: AuthService,
+    private router: Router
   ) {}
 
-  ngOnInit(): void {
-    this.detectarRol();
-    this.cargarHorarios();
-  }
+ngOnInit(): void {
+  this.detectarRol();
 
-  detectarRol(): void {
-    this.esAdmin = this.authService.isAdmin();
-  }
-
-  cargarHorarios(): void {
+  if (this.esAdmin) {
+    // 👑 ADMIN
     this.horarioService.listar().subscribe({
       next: (data) => {
         this.horarios = data;
@@ -220,7 +235,51 @@ export class HorarioListComponent implements OnInit {
       },
       error: (err) => console.error('Error al listar horarios:', err)
     });
+
+  } else if (this.esMedico) {
+    // 👨‍⚕️ MÉDICO
+    this.authService.obtenerPerfilMedico().subscribe({
+      next: (medico) => {
+        this.idMedicoLogueado = medico.id ?? null; // ✅ guardamos ID médico real
+        console.log('🩺 Médico logueado:', medico.id);
+
+        // ahora sí, cargamos sus horarios
+        this.horarioService.listarMios().subscribe({
+          next: (data) => {
+            this.horarios = data;
+            this.horariosFiltrados = [...data];
+          },
+          error: (err) => console.error('Error al listar mis horarios:', err)
+        });
+      },
+      error: (err) => console.error('Error al obtener perfil médico:', err)
+    });
   }
+}
+
+
+
+ detectarRol(): void {
+  this.esAdmin = this.authService.isAdmin();
+  this.esMedico = this.authService.isMedico();
+
+  if (this.esMedico) {
+    this.idMedicoLogueado = this.authService.getUserId();
+  }
+
+
+
+  
+}
+
+irACitas(): void {
+    if (this.esAdmin) {
+      this.router.navigate(['/citas']);
+    } else if (this.esMedico) {
+      this.router.navigate(['/mis-citas']);
+    }
+  }
+
 
   aplicarFiltros(): void {
     this.horariosFiltrados = this.horarios.filter((h) => {

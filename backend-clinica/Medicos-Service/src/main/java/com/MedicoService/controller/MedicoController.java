@@ -12,7 +12,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/medico")
-@PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_MEDICO', 'ROLE_PACIENTE')")
+//@PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_MEDICO', 'ROLE_PACIENTE')")
 public class MedicoController {
 
     @Autowired
@@ -58,5 +58,13 @@ public class MedicoController {
         Medico medico= medicoService.obtenerPorUsuario(username);
         return ResponseEntity.ok(medico);
     }
+
+    @GetMapping("/usuario/{username}")
+    public ResponseEntity<Medico> obtenerPorUsuario(@PathVariable String username) {
+        Medico medico = medicoService.obtenerPorUsuario(username);
+        return ResponseEntity.ok(medico);
+    }
+
+
 
 }

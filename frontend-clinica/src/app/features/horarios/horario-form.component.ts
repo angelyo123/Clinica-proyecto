@@ -4,6 +4,7 @@ import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angula
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { HorarioService } from '../../core/services/horario.service';
 import { Horario } from '../../core/models/horario.model';
+import { AuthService } from '../../core/services/auth.service';
 
 @Component({
   selector: 'app-horario-form',
@@ -62,6 +63,7 @@ import { Horario } from '../../core/models/horario.model';
             <label for="disponible" class="text-sm text-gray-700">Disponible</label>
           </div>
 
+          <!-- Campo Médico ID -->
           <ng-container *ngIf="esAdmin">
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-1">ID Médico</label>
@@ -73,6 +75,7 @@ import { Horario } from '../../core/models/horario.model';
             </div>
           </ng-container>
 
+          <!-- Si es médico, ocultamos el campo -->
           <ng-container *ngIf="!esAdmin">
             <input type="hidden" formControlName="medicoId" />
           </ng-container>
@@ -99,14 +102,16 @@ import { Horario } from '../../core/models/horario.model';
         <p *ngIf="!rolCargado" class="text-center text-gray-500 mt-6">Cargando formulario...</p>
       </div>
     </div>
-  `
+  `,
 })
 export class HorarioFormComponent implements OnInit {
   form!: FormGroup;
   editMode = false;
   id!: number;
   esAdmin = false;
+  esMedico = false;
   rolCargado = false;
+
   dias = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
 
   constructor(
@@ -114,7 +119,8 @@ export class HorarioFormComponent implements OnInit {
     private horarioService: HorarioService,
     private route: ActivatedRoute,
     private router: Router,
-    private cdr: ChangeDetectorRef
+    private cdr: ChangeDetectorRef,
+    private authService: AuthService // ✅ Ahora sí disponible
   ) {}
 
   ngOnInit(): void {
@@ -123,7 +129,7 @@ export class HorarioFormComponent implements OnInit {
       diaSemana: ['', Validators.required],
       horaInicio: ['', Validators.required],
       horaFin: ['', Validators.required],
-      disponible: [true]
+      disponible: [true],
     });
 
     this.detectarRolUsuario();
@@ -132,25 +138,13 @@ export class HorarioFormComponent implements OnInit {
     if (idParam) {
       this.editMode = true;
       this.id = +idParam;
-      this.horarioService.obtener(this.id).subscribe(h => this.form.patchValue(h));
+      this.horarioService.obtener(this.id).subscribe((h) => this.form.patchValue(h));
     }
-
-    const medicoIdParam = this.route.snapshot.queryParamMap.get('medicoId');
-    if (medicoIdParam) this.form.patchValue({ medicoId: +medicoIdParam });
   }
 
   private detectarRolUsuario(): void {
-    const token = localStorage.getItem('token');
-    if (token) {
-      try {
-        const payload = JSON.parse(atob(token.split('.')[1]));
-        const roles: string[] = payload.roles || [];
-        this.esAdmin = roles.includes('ROLE_ADMIN');
-      } catch (e) {
-        console.error('Error al leer roles del token:', e);
-      }
-    }
-
+    this.esAdmin = this.authService.isAdmin();
+    this.esMedico = this.authService.isMedico();
     this.rolCargado = true;
     this.cdr.detectChanges();
   }
@@ -159,6 +153,18 @@ export class HorarioFormComponent implements OnInit {
     if (this.form.invalid) return;
 
     const horario: Horario = this.form.value;
+
+    // 👇 Si es médico, asignamos su propio ID automáticamente
+    if (this.esMedico) {
+    const userId = this.authService.getUserId();
+    if (userId !== null) {
+      horario.medicoId = userId;
+    } else {
+      alert('Error: no se pudo identificar al médico logueado.');
+      return;
+    }
+}
+
     const request = this.editMode
       ? this.horarioService.actualizar(this.id, horario)
       : this.horarioService.crear(horario);
@@ -166,16 +172,18 @@ export class HorarioFormComponent implements OnInit {
     request.subscribe({
       next: () => {
         alert(this.editMode ? 'Horario actualizado correctamente' : 'Horario registrado exitosamente');
-        this.router.navigate(['/horarios']);
+        const destino = this.esMedico ? '/mis-horarios' : '/horarios';
+        this.router.navigate([destino]);
       },
       error: (err) => {
         console.error('Error al guardar horario:', err);
         alert('Ocurrió un error al guardar el horario');
-      }
+      },
     });
   }
 
   cancelar(): void {
-    this.router.navigate(['/horarios']);
+    const destino = this.esMedico ? '/mis-horarios' : '/horarios';
+    this.router.navigate([destino]);
   }
 }

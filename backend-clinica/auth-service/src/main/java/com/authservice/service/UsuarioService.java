@@ -43,4 +43,13 @@ public class UsuarioService {
         usuario.setRoles(Collections.singleton(rolMedico));
         return usuarioRepository.save(usuario);
     }
+
+    public Usuario registrarAdmin(Usuario usuario) {
+        Rol rolAdmin = rolRepository.findByNombre("ROLE_ADMIN")
+                .orElseThrow(() -> new RuntimeException("Rol ROLE_ADMIN no encontrado"));
+        usuario.setPassword(passwordEncoder.encode(usuario.getPassword()));
+        usuario.setRoles(Collections.singleton(rolAdmin));
+        return usuarioRepository.save(usuario);
+    }
+
 }

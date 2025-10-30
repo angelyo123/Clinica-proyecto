@@ -10,72 +10,101 @@ import { AuthService } from '../../core/services/auth.service';
   standalone: true,
   imports: [CommonModule, RouterLink],
   template: `
-    <h2>Médicos</h2>
-    
-    <!-- Mostrar botón solo si el usuario es ADMIN -->
-    <button *ngIf="authService.isAdmin()" (click)="nuevoMedico()">+ Nuevo Médico</button>
+    <div class="p-6">
+      <!-- Header -->
+      <div class="flex flex-col md:flex-row md:justify-between md:items-center mb-6 gap-3">
+        <h2 class="text-2xl font-bold text-gray-800">Gestión de Médicos</h2>
 
-    <p *ngIf="error" class="text-danger">{{ error }}</p>
+        <!-- Botón Crear -->
+        <a
+          *ngIf="esAdmin"
+          routerLink="/medicos/nuevo"
+          class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg shadow transition"
+        >
+          ➕ Nuevo Médico
+        </a>
+      </div>
 
-    <ul>
-      <li *ngFor="let medico of medicos">
-        {{ medico.nombre }} - {{ medico.especialidad }}
-        <!-- Mostrar botón para agendar cita solo si el usuario es PACIENTE -->
-        <button *ngIf="authService.isPaciente()" (click)="agendarCita(medico)">Agendar cita</button>
-      </li>
-    </ul>
+      <!-- Tabla -->
+      <div class="overflow-x-auto bg-white shadow-md rounded-lg">
+        <table class="min-w-full border border-gray-200">
+          <thead class="bg-gray-100">
+  <tr class="text-left text-gray-700">
+    <th class="py-3 px-4 border-b">ID</th>
+    <th class="py-3 px-4 border-b">Nombre</th>
+    <th class="py-3 px-4 border-b">Especialidad</th>
+    <th class="py-3 px-4 border-b">Teléfono</th>
+    <th class="py-3 px-4 border-b">DNI</th>
+    @if (esAdmin) {
+      <th class="py-3 px-4 border-b text-center">Acciones</th>
+    }
+  </tr>
+</thead>
+
+<tbody>
+  @for (m of medicos; track m.id) {
+    <tr class="border-b hover:bg-gray-50 transition">
+      <td class="py-2 px-4">{{ m.id }}</td>
+      <td class="py-2 px-4 font-medium">{{ m.nombre }}</td>
+      <td class="py-2 px-4">{{ m.especialidad }}</td>
+      <td class="py-2 px-4">{{ m.telefono }}</td>
+      <td class="py-2 px-4">{{ m.dni }}</td>
+
+      @if (esAdmin) {
+        <td class="py-2 px-4 text-center flex justify-center gap-3">
+          <a [routerLink]="['/medicos/editar', m.id]"
+             class="inline-flex items-center gap-1 px-3 py-1.5 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition">
+            ✏️ Editar
+          </a>
+          <button (click)="eliminar(m.id!)"
+                  class="inline-flex items-center gap-1 px-3 py-1.5 bg-red-500 text-white rounded-lg hover:bg-red-600 transition">
+            🗑️ Eliminar
+          </button>
+        </td>
+      }
+    </tr>
+  }
+</tbody>
+        </table>
+      </div>
+
+      <!-- Sin registros -->
+      <p *ngIf="!medicos.length" class="text-gray-500 text-center mt-4 italic">
+        No hay médicos registrados.
+      </p>
+    </div>
   `
 })
 export class MedicoListComponent implements OnInit {
   medicos: Medico[] = [];
-  loading = false;
-  error = '';
+  esAdmin = false;
 
-  // ✅ Inyecta los servicios correctamente
   constructor(
     private medicoService: MedicoService,
-    public authService: AuthService,
-    private router: Router
+    private authService: AuthService
   ) {}
 
-  ngOnInit() {
+  ngOnInit(): void {
+    this.esAdmin = this.authService.isAdmin();
     this.cargarMedicos();
   }
 
-  cargarMedicos() {
-    this.loading = true;
-    const roles = this.authService.getUserRoles();
+  cargarMedicos(): void {
+    this.medicoService.listar().subscribe({
+      next: (data) => this.medicos = data,
+      error: (err) => console.error('Error al listar médicos:', err)
+    });
+  }
 
-    if (roles.includes('ROLE_ADMIN')) {
-      this.medicoService.listarAdmin().subscribe({
-        next: (data) => {
-          this.medicos = data;
-          this.loading = false;
+  eliminar(id: number): void {
+    if (confirm('¿Seguro que desea eliminar este médico?')) {
+      this.medicoService.eliminar(id).subscribe({
+        next: () => {
+          alert('Médico eliminado correctamente');
+          this.medicos = this.medicos.filter(m => m.id !== id);
         },
-        error: () => {
-          this.error = 'Error al cargar médicos (admin)';
-          this.loading = false;
-        }
-      });
-    } else if (roles.includes('ROLE_PACIENTE')) {
-      this.medicoService.listarPublico().subscribe({
-        next: (data) => {
-          this.medicos = data;
-          this.loading = false;
-        },
-        error: () => {
-          this.error = 'Error al cargar médicos (paciente)';
-          this.loading = false;
-        }
+        error: (err) => console.error('Error al eliminar médico:', err)
       });
     }
-  }
-
-  nuevoMedico() {
-    this.router.navigate(['/medicos/nuevo']);
-  }
-
-  agendarCita(medico: Medico) {
-    this.router.navigate(['/citas/nueva'], { queryParams: { medicoId: medico.id } });
   }
 }

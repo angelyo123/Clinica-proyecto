@@ -48,7 +48,10 @@ public class HorarioServiceImpl implements HorarioService {
     }
 
     @Override
-    public List<Horario> listarPorMedico(Long medicoId) {
-        return horarioRepository.findByMedicoId(medicoId);
+    public List<Horario> listarPorMedico(Long idMedico) {
+        System.out.println("🔍 Buscando horarios del médico ID: " + idMedico);
+        List<Horario> result = horarioRepository.findByMedicoId(idMedico);
+        System.out.println("✅ Horarios encontrados: " + result.size());
+        return result;
     }
 }

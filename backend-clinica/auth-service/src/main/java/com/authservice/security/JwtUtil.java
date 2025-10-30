@@ -27,7 +27,7 @@ public class JwtUtil {
     }
 
     /** 🔹 Generar token con roles incluidos **/
-    public String generateToken(Authentication authentication) {
+    public String generateToken(Authentication authentication, Long userId) {
         UserDetails userPrincipal = (UserDetails) authentication.getPrincipal();
 
         Map<String, Object> claims = new HashMap<>();
@@ -35,6 +35,7 @@ public class JwtUtil {
                 .stream()
                 .map(GrantedAuthority::getAuthority)
                 .collect(Collectors.toList()));
+        claims.put("id", userId); // 👈 incluimos el ID del usuario
 
         return Jwts.builder()
                 .setClaims(claims)

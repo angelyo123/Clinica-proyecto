@@ -34,13 +34,33 @@ public class CitaServiceImpl implements CitaService {
 
     @Override
     public Cita crear(Cita cita) {
-        Map<String, Object> paciente = pacienteClient.obtener(cita.getIdPaciente());
-        Map<String, Object> medico = medicoClient.obtener(cita.getIdMedico());
+        System.out.println("🩺 [DEBUG] Intentando crear cita...");
+        System.out.println("📦 Datos recibidos: " + cita);
+
+        Map<String, Object> paciente = null;
+        Map<String, Object> medico = null;
+
+        try {
+            paciente = pacienteClient.obtener(cita.getIdPaciente());
+            medico = medicoClient.obtener(cita.getIdMedico());
+        } catch (Exception e) {
+            System.out.println("❌ [ERROR] Fallo al consumir microservicio externo:");
+            e.printStackTrace();
+        }
+
+        System.out.println("🧩 [DEBUG] Paciente obtenido: " + paciente);
+        System.out.println("🧩 [DEBUG] Médico obtenido: " + medico);
+
         if (paciente == null || medico == null) {
+            System.out.println("🚨 [ERROR] Paciente o médico no válido. Rechazando creación.");
             throw new IllegalArgumentException("Paciente o médico no válido");
         }
+
         cita.setEstado("PENDIENTE");
-        return citaRepository.save(cita);
+        Cita nueva = citaRepository.save(cita);
+
+        System.out.println("✅ [OK] Cita creada correctamente con ID: " + nueva.getId());
+        return nueva;
     }
 
     @Override
@@ -133,30 +153,70 @@ public class CitaServiceImpl implements CitaService {
 
     @Override
     public CitaDTO crearDetalle(CitaDTO dto) {
+        System.out.println("🩺 [DEBUG] Iniciando creación de cita con detalle...");
+        System.out.println("📦 DTO recibido: " + dto);
+
         Cita nuevaCita = new Cita();
         nuevaCita.setFechaHora(dto.getFechaHora());
         nuevaCita.setEstado("PENDIENTE");
 
-        Long medicoId = ((Number) dto.getMedico().get("id")).longValue();
-        Long pacienteId = ((Number) dto.getPaciente().get("id")).longValue();
+        // 🔹 Convertir IDs
+        Long medicoId = null;
+        Long pacienteId = null;
+        try {
+            medicoId = ((Number) dto.getMedico().get("id")).longValue();
+            pacienteId = ((Number) dto.getPaciente().get("id")).longValue();
+        } catch (Exception e) {
+            System.out.println("⚠️ [WARN] Error al extraer IDs de médico/paciente del DTO:");
+            e.printStackTrace();
+        }
 
         nuevaCita.setIdMedico(medicoId);
         nuevaCita.setIdPaciente(pacienteId);
 
-        Map<String, Object> medico = medicoClient.obtener(medicoId);
-        Map<String, Object> paciente = pacienteClient.obtener(pacienteId);
+        System.out.println("🔍 Solicitando datos externos:");
+        System.out.println("   - Médico ID: " + medicoId);
+        System.out.println("   - Paciente ID: " + pacienteId);
+
+        Map<String, Object> medico = null;
+        Map<String, Object> paciente = null;
+
+        try {
+            medico = medicoClient.obtener(medicoId);
+            System.out.println("✅ [OK] Respuesta médico: " + medico);
+        } catch (Exception e) {
+            System.out.println("❌ [ERROR] Falló la consulta al microservicio de MÉDICOS:");
+            e.printStackTrace();
+        }
+
+        try {
+            paciente = pacienteClient.obtener(pacienteId);
+            System.out.println("✅ [OK] Respuesta paciente: " + paciente);
+        } catch (Exception e) {
+            System.out.println("❌ [ERROR] Falló la consulta al microservicio de PACIENTES:");
+            e.printStackTrace();
+        }
+
         if (paciente == null || medico == null) {
+            System.out.println("🚨 [ERROR] Paciente o médico no válido. Datos nulos detectados.");
             throw new IllegalArgumentException("Paciente o médico no válido");
         }
 
+        // 🔹 Persistir en base de datos
         Cita citaGuardada = citaRepository.save(nuevaCita);
 
+        System.out.println("💾 [OK] Cita guardada con ID: " + citaGuardada.getId());
+
+        // 🔹 Devolver DTO completo
         dto.setId(citaGuardada.getId());
         dto.setEstado(citaGuardada.getEstado());
         dto.setMedico(medico);
         dto.setPaciente(paciente);
+
+        System.out.println("✅ [SUCCESS] Cita creada correctamente: " + dto);
         return dto;
     }
+
 
     @Override
     public CitaDTO actualizarDetalle(Long id, CitaDTO dto) {
