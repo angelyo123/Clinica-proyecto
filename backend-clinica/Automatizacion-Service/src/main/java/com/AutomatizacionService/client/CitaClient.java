@@ -1,5 +1,6 @@
 package com.AutomatizacionService.client;
 
+import com.AutomatizacionService.model.CitaRequest;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -12,5 +13,5 @@ import java.util.Map;
 )
 public interface CitaClient {
     @PostMapping("/crear")
-    Map<String, Object> crearCita(@RequestBody Map<String, Object> cita);
+    Map<String, Object> crearCita(@RequestBody CitaRequest cita);
 }

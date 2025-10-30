@@ -13,4 +13,5 @@ public interface MedicoService {
     void eliminar(Long id);
     Medico obtenerPorUsuario(String username);
 
+    List<Medico> listarPorEspecialidad(String especialidad);
 }

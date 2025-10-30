@@ -1,5 +1,6 @@
 package com.MedicoService.config;
 
+import feign.Logger;
 import feign.RequestInterceptor;
 import feign.RequestTemplate;
 import org.springframework.context.annotation.Bean;
@@ -9,6 +10,11 @@ import org.springframework.security.core.context.SecurityContextHolder;
 
 @Configuration
 public class FeignConfig {
+
+    @Bean
+    public Logger.Level feignLoggerLevel() {
+        return Logger.Level.FULL;
+    }
 
     @Bean
     public RequestInterceptor requestInterceptor() {
