@@ -1,33 +1,164 @@
-<div class="register-container">
-  <h2>Registro</h2>
+<div class="max-w-md mx-auto p-6 md:p-10 mt-10">
+  
+  <form [formGroup]="form" 
+        (ngSubmit)="onSubmit()"
+        class="bg-white shadow-lg rounded-lg p-8 border border-gray-200">
 
-  <div class="switch">
-    <label>
-      <input type="radio" name="tipo" [value]="'paciente'" (change)="tipo='paciente'" [checked]="tipo==='paciente'"> Paciente
-    </label>
-    <label>
-      <input type="radio" name="tipo" [value]="'medico'" (change)="tipo='medico'" [checked]="tipo==='medico'"> Médico
-    </label>
-  </div>
+    <h2 class="text-3xl font-bold text-gray-800 mb-6 text-center">
+      Registro
+    </h2>
 
-  <form [formGroup]="form" (ngSubmit)="onSubmit()">
-    <input type="text" placeholder="Nombre" formControlName="nombre" required />
-    <input type="text" placeholder="Usuario" formControlName="username" required />
-    <input type="password" placeholder="Contraseña" formControlName="password" required />
-
-    <div *ngIf="tipo === 'paciente'">
-      <input type="text" placeholder="DNI" formControlName="dni" />
-      <input type="text" placeholder="Teléfono" formControlName="telefono" />
+    <div class="flex justify-center gap-8 mb-6 border-b pb-6">
+      <label class="flex items-center gap-2 cursor-pointer">
+        <input type="radio" 
+               name="rol" 
+               value="paciente" 
+               [(ngModel)]="tipo"
+               (ngModelChange)="onTipoChange()"
+               [ngModelOptions]="{standalone: true}"
+               class="w-5 h-5 form-radio text-blue-600 focus:ring-blue-500">
+        <span class="font-medium text-gray-700">Paciente</span>
+      </label>
+      <label class="flex items-center gap-2 cursor-pointer">
+        <input type="radio" 
+               name="rol" 
+               value="medico" 
+               [(ngModel)]="tipo"
+               (ngModelChange)="onTipoChange()"
+               [ngModelOptions]="{standalone: true}"
+               class="w-5 h-5 form-radio text-blue-600 focus:ring-blue-500">
+        <span class="font-medium text-gray-700">Médico</span>
+      </label>
     </div>
 
-    <div *ngIf="tipo === 'medico'">
-      <input type="text" placeholder="Especialidad" formControlName="especialidad" />
+    <div class="space-y-4">
+      
+      <div *ngIf="tipo === 'paciente'">
+    <div class="space-y-4">
+        <div class="relative">
+            <div class="absolute inset-0 flex items-center" aria-hidden="true">
+                <div class="w-full border-t border-gray-300"></div>
+            </div>
+            <div class="relative flex justify-center">
+                <span class="bg-white px-3 text-lg font-medium text-gray-900">Datos Personales</span>
+            </div>
+        </div>
+        
+        <div>
+            <label for="pac-nombre" class="block text-sm font-semibold text-gray-700 mb-1">Nombre:</label>
+            <input id="pac-nombre" 
+                   type="text" 
+                   formControlName="nombre" 
+                   class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                   (keypress)="onlyLetters($event)" /><div *ngIf="form.get('nombre')?.invalid && form.get('nombre')?.touched" class="text-red-600 text-sm mt-1">
+                <div *ngIf="form.get('nombre')?.errors?.['required']">
+                    El nombre es obligatorio.
+                </div>
+                <div *ngIf="form.get('nombre')?.errors?.['pattern']">
+                    El nombre solo puede contener letras y espacios.
+                </div>
+            </div>
+        </div>
+
+        <div>
+            <label for="pac-dni" class="block text-sm font-semibold text-gray-700 mb-1">DNI:</label>
+            <input id="pac-dni" 
+                   type="text" 
+                   formControlName="dni" 
+                   maxlength="8"  class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                   (keypress)="onlyNumbers($event)" /><div *ngIf="form.get('dni')?.invalid && form.get('dni')?.touched" class="text-red-600 text-sm mt-1">
+                <div *ngIf="form.get('dni')?.errors?.['required']">
+                    El DNI es obligatorio.
+                </div>
+                <div *ngIf="form.get('dni')?.errors?.['minlength'] || form.get('dni')?.errors?.['maxlength']">
+                    El DNI debe tener exactamente 8 dígitos.
+                </div>
+                <div *ngIf="form.get('dni')?.errors?.['pattern']">
+                    El DNI solo debe contener números.
+                </div>
+            </div>
+        </div>
+
+        <div>
+            <label for="pac-telefono" class="block text-sm font-semibold text-gray-700 mb-1">Teléfono:</label>
+            <input id="pac-telefono" 
+                   type="text" 
+                   formControlName="telefono" 
+                   maxlength="9" class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                   (keypress)="onlyNumbers($event)" /><div *ngIf="form.get('telefono')?.invalid && form.get('telefono')?.touched" class="text-red-600 text-sm mt-1">
+                <div *ngIf="form.get('telefono')?.errors?.['required']">
+                    El teléfono es obligatorio.
+                </div>
+                <div *ngIf="form.get('telefono')?.errors?.['minlength'] || form.get('telefono')?.errors?.['maxlength']">
+                    El teléfono debe tener exactamente 9 dígitos.
+                </div>
+                <div *ngIf="form.get('telefono')?.errors?.['pattern']">
+                    El teléfono solo debe contener números.
+                </div>
+            </div>
+        </div>
+
+        <div class="relative pt-4">
+            <div class="absolute inset-0 flex items-center" aria-hidden="true">
+                <div class="w-full border-t border-gray-300"></div>
+            </div>
+            <div class="relative flex justify-center">
+                <span class="bg-white px-3 text-lg font-medium text-gray-900">Datos de Acceso</span>
+            </div>
+        </div>
+
+        <div>
+            <label for="pac-username" class="block text-sm font-semibold text-gray-700 mb-1">Username (Usuario de Acceso):</label>
+            <input id="pac-username" type="text" formControlName="username" class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-gray-100" [readOnly]="true" />
+            <p class="text-xs text-gray-500 mt-1">Se genera automáticamente con el DNI.</p>
+        </div>
+        <div>
+            <label for="pac-password" class="block text-sm font-semibold text-gray-700 mb-1">Contraseña Temporal:</label>
+            <input id="pac-password" type="text" formControlName="password" class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-gray-100" [readOnly]="true" />
+            <p class="text-xs text-gray-500 mt-1">El paciente usará esta contraseña para su primer inicio de sesión.</p>
+        </div>
+    </div>
+</div>
+
+      <div *ngIf="tipo === 'medico'">
+        <div class="space-y-4">
+          <div>
+            <label for="med-nombre" class="block text-sm font-semibold text-gray-700 mb-1">Nombre:</label>
+            <input id="med-nombre" type="text" formControlName="nombre" class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+          </div>
+          <div>
+            <label for="med-username" class="block text-sm font-semibold text-gray-700 mb-1">Usuario:</label>
+            <input id="med-username" type="text" formControlName="username" class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+          </div>
+          <div>
+            <label for="med-password" class="block text-sm font-semibold text-gray-700 mb-1">Contraseña:</label>
+            <input id="med-password" type="password" formControlName="password" class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+          </div>
+          <div>
+            <label for="med-especialidad" class="block text-sm font-semibold text-gray-700 mb-1">Especialidad:</label>
+            <input id="med-especialidad" type="text" formControlName="especialidad" class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+          </div>
+        </div>
+      </div>
+
+      <button type="submit" 
+              [disabled]="form.invalid"
+              class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-4 rounded-lg shadow 
+                     transition-colors duration-200 mt-6
+                     disabled:bg-gray-400 disabled:cursor-not-allowed">
+        Registrarme
+      </button>
+
     </div>
 
-    <button type="submit">Registrarme</button>
+    <div class="text-center pt-6 border-t mt-6">
+      <p class="text-sm text-gray-600">
+        ¿Ya tienes una cuenta? 
+        <a routerLink="/login" class="font-medium text-blue-600 hover:underline">
+          Inicia sesión
+        </a>
+      </p>
+    </div>
+
   </form>
-
-  <p class="back-login">
-    ¿Ya tienes cuenta? <a routerLink="/login">Inicia sesión</a>
-  </p>
 </div>

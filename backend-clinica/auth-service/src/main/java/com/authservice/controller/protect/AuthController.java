@@ -1,6 +1,7 @@
 package com.authservice.controller.protect;
 
 
+import com.authservice.model.RegistroPacienteRequest;
 import com.authservice.model.Rol;
 import com.authservice.model.Usuario;
 import com.authservice.repository.RolRepository;
@@ -72,6 +73,10 @@ public ResponseEntity<Map<String, Object>> registerPaciente(@RequestBody Map<Str
     usuario.setPassword(password);
 
     Usuario nuevo = usuarioService.registrarPaciente(usuario);
+    @PostMapping("/register/paciente")
+    public ResponseEntity<Map<String, Object>> registerPaciente(@RequestBody RegistroPacienteRequest request) {
+
+        Usuario nuevo = usuarioService.registrarPaciente(request);
 
     // ✅ Retornar JSON
     Map<String, Object> response = new HashMap<>();

@@ -3,6 +3,7 @@ package com.horariosservice.security;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
 
 import java.security.Key;
@@ -26,7 +27,7 @@ public class JwtUtil {
         return extractAllClaims(token).get("roles", List.class);
     }
 
-    public boolean isTokenValid(String token) {
+    public boolean isTokenValid(String token, UserDetails userDetails) {
         try {
             return !extractAllClaims(token).getExpiration().before(new Date());
         } catch (Exception e) {

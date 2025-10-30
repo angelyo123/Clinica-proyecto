@@ -31,6 +31,7 @@ public class SecurityConfig {
                 .cors(cors -> cors.configurationSource(corsConfigurationSource())) // Asume que tienes CORS configurado
                 .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(auth -> auth
+                            .requestMatchers("/paciente/crear").permitAll()
                         .requestMatchers("/public/**").permitAll()
                         .anyRequest().authenticated()
                 )

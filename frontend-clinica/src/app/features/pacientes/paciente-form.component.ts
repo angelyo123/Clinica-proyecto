@@ -27,13 +27,15 @@ import { Paciente } from '../../core/models/paciente.model';
           <input type="text" 
                  id="nombre" 
                  formControlName="nombre" 
+                 (keypress)="onlyLetters($event)" 
                  class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm 
-                        focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500
-                        invalid:border-red-500 invalid:text-red-600 focus:invalid:ring-red-500" />
-          <p *ngIf="form.get('nombre')?.invalid && form.get('nombre')?.touched" 
-             class="text-xs text-red-600 mt-1">
-            El nombre es obligatorio.
-          </p>
+                         focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500
+                         invalid:border-red-500 invalid:text-red-600 focus:invalid:ring-red-500" />
+          <div *ngIf="form.get('nombre')?.invalid && form.get('nombre')?.touched" 
+               class="text-xs text-red-600 mt-1">
+            <p *ngIf="form.get('nombre')?.errors?.['required']">El nombre es obligatorio.</p>
+            <p *ngIf="form.get('nombre')?.errors?.['pattern']">El nombre solo puede contener letras y espacios.</p>
+          </div>
         </div>
 
         <div>
@@ -43,13 +45,17 @@ import { Paciente } from '../../core/models/paciente.model';
           <input type="text" 
                  id="dni" 
                  formControlName="dni" 
+                 maxlength="8" 
+                 (keypress)="onlyNumbers($event)" 
                  class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm 
-                        focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500
-                        invalid:border-red-500 invalid:text-red-600 focus:invalid:ring-red-500" />
-          <p *ngIf="form.get('dni')?.invalid && form.get('dni')?.touched" 
-             class="text-xs text-red-600 mt-1">
-            El DNI es obligatorio.
-          </p>
+                         focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500
+                         invalid:border-red-500 invalid:text-red-600 focus:invalid:ring-red-500" />
+          <div *ngIf="form.get('dni')?.invalid && form.get('dni')?.touched" 
+               class="text-xs text-red-600 mt-1">
+            <p *ngIf="form.get('dni')?.errors?.['required']">El DNI es obligatorio.</p>
+            <p *ngIf="form.get('dni')?.errors?.['minlength'] || form.get('dni')?.errors?.['maxlength']">El DNI debe tener exactamente 8 dígitos.</p>
+            <p *ngIf="form.get('dni')?.errors?.['pattern']">El DNI solo debe contener números.</p>
+          </div>
         </div>
 
         <div>
@@ -59,13 +65,17 @@ import { Paciente } from '../../core/models/paciente.model';
           <input type="text" 
                  id="telefono" 
                  formControlName="telefono" 
+                 maxlength="9" 
+                 (keypress)="onlyNumbers($event)" 
                  class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm 
-                        focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500
-                        invalid:border-red-500 invalid:text-red-600 focus:invalid:ring-red-500" />
-          <p *ngIf="form.get('telefono')?.invalid && form.get('telefono')?.touched" 
-             class="text-xs text-red-600 mt-1">
-            El teléfono es obligatorio.
-          </p>
+                         focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500
+                         invalid:border-red-500 invalid:text-red-600 focus:invalid:ring-red-500" />
+          <div *ngIf="form.get('telefono')?.invalid && form.get('telefono')?.touched" 
+               class="text-xs text-red-600 mt-1">
+            <p *ngIf="form.get('telefono')?.errors?.['required']">El teléfono es obligatorio.</p>
+            <p *ngIf="form.get('telefono')?.errors?.['minlength'] || form.get('telefono')?.errors?.['maxlength']">El teléfono debe tener exactamente 9 dígitos.</p>
+            <p *ngIf="form.get('telefono')?.errors?.['pattern']">El teléfono solo debe contener números.</p>
+          </div>
         </div>
 
         <div class="flex items-center justify-end gap-4 pt-4">
@@ -77,15 +87,15 @@ import { Paciente } from '../../core/models/paciente.model';
           <button type="submit" 
                   [disabled]="form.invalid"
                   class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg shadow 
-                         transition-colors duration-200
-                         disabled:bg-gray-400 disabled:cursor-not-allowed">
+                          transition-colors duration-200
+                          disabled:bg-gray-400 disabled:cursor-not-allowed">
             {{ editMode ? 'Actualizar' : 'Guardar' }}
           </button>
         </div>
 
       </form>
     </div>
-  `
+  `,
 })
 export class PacienteFormComponent implements OnInit {
   form!: FormGroup;
@@ -99,11 +109,54 @@ export class PacienteFormComponent implements OnInit {
     private router: Router
   ) {}
 
+  // 🚨 MÉTODOS DE FILTRADO EN TIEMPO REAL (KEYPRESS) 🚨
+
+  /** Permite solo la entrada de letras, acentos y espacios. */
+  public onlyLetters(event: KeyboardEvent): boolean {
+    const isControlKey = event.key === 'Backspace' || event.key === 'Delete' || event.key.startsWith('Arrow') || event.key === 'Tab';
+    if (isControlKey) return true;
+    
+    const char = event.key;
+    const isLetter = /^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]$/.test(char); 
+    return isLetter;
+  }
+
+  /** Permite solo la entrada de dígitos (0-9). */
+  public onlyNumbers(event: KeyboardEvent): boolean {
+    const isControlKey = event.key === 'Backspace' || event.key === 'Delete' || event.key.startsWith('Arrow') || event.key === 'Tab';
+    if (isControlKey) return true;
+
+    const char = event.key;
+    const isDigit = /^\d$/.test(char); 
+    return isDigit;
+  }
+  
+  // --- ngOnInit CON VALIDACIONES ---
+
   ngOnInit(): void {
+    const soloLetrasRegEx = /^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+$/;
+    const soloNumerosRegEx = /^[0-9]+$/;
+
     this.form = this.fb.group({
-      nombre: ['', Validators.required],
-      dni: ['', Validators.required],
-      telefono: ['', Validators.required]
+      // Nombre: Solo letras
+      nombre: ['', [
+        Validators.required, 
+        Validators.pattern(soloLetrasRegEx)
+      ]],
+      // DNI: 8 dígitos, solo números
+      dni: ['', [
+        Validators.required, 
+        Validators.minLength(8), 
+        Validators.maxLength(8), 
+        Validators.pattern(soloNumerosRegEx)
+      ]],
+      // Teléfono: 9 dígitos, solo números
+      telefono: ['', [
+        Validators.required, 
+        Validators.minLength(9), 
+        Validators.maxLength(9), 
+        Validators.pattern(soloNumerosRegEx)
+      ]]
     });
 
     const idParam = this.route.snapshot.paramMap.get('id');
@@ -114,8 +167,12 @@ export class PacienteFormComponent implements OnInit {
     }
   }
 
+
   guardar(): void {
-    if (this.form.invalid) return;
+    if (this.form.invalid) {
+        this.form.markAllAsTouched();
+        return;
+    }
 
     const paciente: Paciente = this.form.value;
 
