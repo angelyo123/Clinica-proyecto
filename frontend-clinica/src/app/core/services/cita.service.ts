@@ -35,9 +35,13 @@ actualizarEstado(id: number, estado: string): Observable<Cita> {
   }
 // --- NUEVO MÉTODO PARA PACIENTE ---
   listarDetallesPorPaciente(pacienteId: number): Observable<Cita[]> {
-    const params = new HttpParams().set('pacienteId', pacienteId.toString());
-    return this.http.get<Cita[]>(`${this.apiUrl}/listarPorPaciente/detalles`, { params });
-  }
+  const params = new HttpParams().set('pacienteId', pacienteId.toString());
+  return this.http.get<Cita[]>(`${this.apiUrl}/listarPorPaciente/detalles`, {
+    params,
+    headers: this.getAuthHeaders()   // 👈 AÑADE ESTO
+  });
+}
+
 
   // --- NUEVO MÉTODO PARA MÉDICO ---
   // Cambia 'any[]' por 'CitaMedicoDTO[]' si tienes ese modelo

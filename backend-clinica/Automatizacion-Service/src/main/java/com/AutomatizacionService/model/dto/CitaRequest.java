@@ -1,4 +1,4 @@
-package com.AutomatizacionService.model;
+package com.AutomatizacionService.model.dto;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;

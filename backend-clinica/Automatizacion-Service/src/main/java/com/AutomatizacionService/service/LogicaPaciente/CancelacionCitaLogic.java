@@ -1,7 +1,7 @@
 package com.AutomatizacionService.service.LogicaPaciente;
 
 import com.AutomatizacionService.client.CitaClient;
-import com.AutomatizacionService.model.CitaDecisionDTO;
+import com.AutomatizacionService.model.dto.CitaDecisionDTO;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 

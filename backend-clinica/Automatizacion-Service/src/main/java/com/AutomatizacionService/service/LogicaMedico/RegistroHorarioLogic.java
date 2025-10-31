@@ -1,6 +1,6 @@
 package com.AutomatizacionService.service.LogicaMedico;
 
-import com.AutomatizacionService.service.DeepSeekService;
+import com.AutomatizacionService.service.orquestador.DeepSeekService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;

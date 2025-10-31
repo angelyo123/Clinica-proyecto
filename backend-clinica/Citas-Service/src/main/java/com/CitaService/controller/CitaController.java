@@ -13,7 +13,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/cita")
-@PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_MEDICO','ROLE_PACIENTE')")
+//@PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_MEDICO','ROLE_PACIENTE')")
 public class CitaController {
 
     @Autowired
@@ -85,7 +85,6 @@ public class CitaController {
     }
 
     @GetMapping("/listarPorPaciente/detalles")
-    @PreAuthorize("hasAnyAuthority('ROLE_PACIENTE', 'ROLE_ADMIN')")
     public List<CitaDTO> listarDetallesPorPaciente(@RequestParam Long pacienteId) {
 
         return citaService.listarDetallesPorPaciente(pacienteId);
@@ -106,7 +105,7 @@ public class CitaController {
     }
 
     @PutMapping("/cancelar/porPaciente/{pacienteId}")
-    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_PACIENTE')")
+    @PreAuthorize("hasAnyAuthority('ROLE_PACIENTE','ROLE_ADMIN')")
     public ResponseEntity<String> cancelarCitasPorPaciente(@PathVariable Long pacienteId) {
         citaService.cancelarCitasPorPaciente(pacienteId);
         return ResponseEntity.ok("Todas las citas del paciente han sido canceladas.");

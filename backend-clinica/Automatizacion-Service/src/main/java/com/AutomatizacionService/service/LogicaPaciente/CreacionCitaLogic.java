@@ -1,10 +1,10 @@
 package com.AutomatizacionService.service.LogicaPaciente;
 
 import com.AutomatizacionService.client.CitaClient;
-import com.AutomatizacionService.model.CitaRequest;
-import com.AutomatizacionService.model.SugerenciaPendiente;
+import com.AutomatizacionService.model.dto.CitaRequest;
+import com.AutomatizacionService.model.entity.SugerenciaPendiente;
 import com.AutomatizacionService.repository.SugerenciaPendienteRepository;
-import com.AutomatizacionService.service.SugerenciaCacheService;
+import com.AutomatizacionService.service.orquestador.SugerenciaCacheService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 

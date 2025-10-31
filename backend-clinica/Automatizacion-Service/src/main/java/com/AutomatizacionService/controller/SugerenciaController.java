@@ -1,6 +1,6 @@
 package com.AutomatizacionService.controller;
 
-import com.AutomatizacionService.model.CitaDecisionDTO;
+import com.AutomatizacionService.model.dto.CitaDecisionDTO;
 import com.AutomatizacionService.service.orquestador.SugerenciaIAService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -71,11 +71,6 @@ public class SugerenciaController {
     @GetMapping("/ping")
     public ResponseEntity<Map<String, Object>> ping() {
         return ResponseEntity.ok(Map.of("estado", "OK", "mensaje", "Automatización activa 🚀"));
-    }
-
-    @PostMapping("/conversacion")
-    public ResponseEntity<Map<String, Object>> procesarConversacion(@RequestBody Map<String, Object> solicitud) {
-        return ResponseEntity.ok(sugerenciaIAService.procesarConversacion(solicitud));
     }
 
 }

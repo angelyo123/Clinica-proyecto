@@ -1,23 +1,40 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { RouterLink } from '@angular/router'; // 👈 agrega esto
+import { RouterLink } from '@angular/router';
 import { CitaService } from '../../../core/services/cita.service';
 import { PacienteService } from '../../../core/services/paciente.service';
 import { Cita } from '../../../core/models/cita.model';
+import { AuthService } from '../../../core/services/auth.service'; // 👈 Importamos AuthService
 
 @Component({
   selector: 'app-mis-citas',
   standalone: true,
-  imports: [CommonModule, RouterLink], // 👈 agrégalo aquí
+  imports: [CommonModule, RouterLink],
   template: `
     <div class="max-w-5xl mx-auto p-6">
       <div class="flex justify-between items-center mb-4">
         <h2 class="text-2xl font-bold text-gray-800">🩺 Mis Citas</h2>
-        <button
-          class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg shadow"
-          routerLink="/medicos-disponibles">
-          ➕ Reservar nueva cita
-        </button>
+
+        <div class="flex gap-3">
+          <button
+            class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg shadow transition"
+            routerLink="/medicos-disponibles">
+            ➕ Reservar nueva cita
+          </button>
+
+          <button
+            class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg shadow transition"
+            routerLink="/pacientes/chat">
+            💬 Chat con IA
+          </button>
+
+          <!-- 🔒 Botón de cerrar sesión -->
+          <button
+            class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg shadow transition"
+            (click)="cerrarSesion()">
+            🔓 Cerrar sesión
+          </button>
+        </div>
       </div>
 
       <div *ngIf="!citas.length" class="text-center text-gray-500">
@@ -63,7 +80,11 @@ import { Cita } from '../../../core/models/cita.model';
 export class MisCitasComponent implements OnInit {
   citas: Cita[] = [];
 
-  constructor(private citaService: CitaService, private pacienteService: PacienteService) {}
+  constructor(
+    private citaService: CitaService,
+    private pacienteService: PacienteService,
+    private authService: AuthService // 👈 Inyectamos AuthService
+  ) {}
 
   ngOnInit(): void {
     this.cargarCitas();
@@ -92,6 +113,13 @@ export class MisCitasComponent implements OnInit {
         },
         error: err => console.error('Error al cancelar cita:', err)
       });
+    }
+  }
+
+  // ✅ Método para cerrar sesión
+  cerrarSesion(): void {
+    if (confirm('¿Seguro que deseas cerrar sesión?')) {
+      this.authService.logout();
     }
   }
 

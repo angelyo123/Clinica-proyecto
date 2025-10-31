@@ -1,4 +1,4 @@
-package com.AutomatizacionService.service;
+package com.AutomatizacionService.service.orquestador;
 
 import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -82,4 +82,16 @@ public class SugerenciaCacheService {
         redisTemplate.delete(CONTEXTO + pacienteId);
         System.out.println("🧹 Contexto completo eliminado para paciente " + pacienteId);
     }
+
+    /** Elimina un dato específico del contexto del paciente **/
+    public void eliminarDatoContexto(Long pacienteId, String clave) {
+        String key = DATOS + pacienteId;
+        Map<String, Object> datos = (Map<String, Object>) redisTemplate.opsForValue().get(key);
+        if (datos != null && datos.containsKey(clave)) {
+            datos.remove(clave);
+            redisTemplate.opsForValue().set(key, datos, 1, TimeUnit.HOURS);
+            System.out.println("🗑️ Dato eliminado [" + clave + "] del contexto del paciente " + pacienteId);
+        }
+    }
+
 }

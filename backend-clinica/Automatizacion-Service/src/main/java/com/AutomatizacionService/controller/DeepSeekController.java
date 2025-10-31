@@ -1,6 +1,6 @@
 package com.AutomatizacionService.controller;
 
-import com.AutomatizacionService.service.DeepSeekService;
+import com.AutomatizacionService.service.orquestador.DeepSeekService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;

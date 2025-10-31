@@ -1,11 +1,10 @@
 package com.AutomatizacionService.service.orquestador;
 
-import com.AutomatizacionService.model.CitaDecisionDTO;
+import com.AutomatizacionService.model.dto.CitaDecisionDTO;
 import com.AutomatizacionService.service.LogicaMedico.RegistroHorarioLogic;
 import com.AutomatizacionService.service.LogicaPaciente.AnalisisSintomasLogic;
 import com.AutomatizacionService.service.LogicaPaciente.CancelacionCitaLogic;
 import com.AutomatizacionService.service.LogicaPaciente.ConfirmacionCitaLogic;
-import com.AutomatizacionService.service.LogicaPaciente.CreacionCitaLogic;
 import com.AutomatizacionService.service.conversacionIA.ConversacionPacienteService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;

@@ -1,6 +1,6 @@
 package com.AutomatizacionService.config;
 
-import com.AutomatizacionService.service.SystemAuthService;
+import com.AutomatizacionService.service.orquestador.SystemAuthService;
 import feign.RequestInterceptor;
 import feign.RequestTemplate;
 import org.springframework.context.annotation.Configuration;

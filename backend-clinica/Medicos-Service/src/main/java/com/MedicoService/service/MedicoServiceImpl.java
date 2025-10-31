@@ -70,18 +70,8 @@ public class MedicoServiceImpl implements MedicoService {
 
     @Override
     public List<Medico> listarPorEspecialidad(String especialidad) {
-        String normalizado = java.text.Normalizer.normalize(especialidad, java.text.Normalizer.Form.NFD)
-                .replaceAll("[\\p{InCombiningDiacriticalMarks}]", "")
-                .toLowerCase();
-
-        return medicoRepository.findAll().stream()
-                .filter(m -> {
-                    String esp = java.text.Normalizer.normalize(m.getEspecialidad(), java.text.Normalizer.Form.NFD)
-                            .replaceAll("[\\p{InCombiningDiacriticalMarks}]", "")
-                            .toLowerCase();
-                    return esp.equals(normalizado);
-                })
-                .toList();
+        if (especialidad == null || especialidad.isBlank()) return List.of();
+        return medicoRepository.findByEspecialidad(especialidad.trim());
     }
 
 

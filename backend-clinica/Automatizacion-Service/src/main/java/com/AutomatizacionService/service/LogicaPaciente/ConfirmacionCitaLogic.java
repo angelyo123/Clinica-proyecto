@@ -1,12 +1,12 @@
 package com.AutomatizacionService.service.LogicaPaciente;
 
 import com.AutomatizacionService.client.CitaClient;
-import com.AutomatizacionService.model.CitaDecisionDTO;
-import com.AutomatizacionService.model.CitaRequest;
-import com.AutomatizacionService.model.SugerenciaPendiente;
+import com.AutomatizacionService.model.dto.CitaDecisionDTO;
+import com.AutomatizacionService.model.dto.CitaRequest;
+import com.AutomatizacionService.model.entity.SugerenciaPendiente;
 import com.AutomatizacionService.repository.SugerenciaPendienteRepository;
-import com.AutomatizacionService.service.DeepSeekService;
-import com.AutomatizacionService.service.SugerenciaCacheService;
+import com.AutomatizacionService.service.orquestador.DeepSeekService;
+import com.AutomatizacionService.service.orquestador.SugerenciaCacheService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Autowired;

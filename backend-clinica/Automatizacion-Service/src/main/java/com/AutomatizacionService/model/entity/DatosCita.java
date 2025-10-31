@@ -1,4 +1,4 @@
-package com.AutomatizacionService.model;
+package com.AutomatizacionService.model.entity;
 
 
 import lombok.AllArgsConstructor;

@@ -1,11 +1,9 @@
 package com.AutomatizacionService.client;
 
-import com.AutomatizacionService.model.CitaRequest;
+import com.AutomatizacionService.model.dto.CitaRequest;
 import org.springframework.cloud.openfeign.FeignClient;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.*;
+
 import java.util.Map;
 
 @FeignClient(
@@ -22,4 +20,5 @@ public interface CitaClient {
 
     @PutMapping("/cancelar/porPaciente/{pacienteId}")
     Map<String, Object> cancelarPorPaciente(@PathVariable("pacienteId") Long pacienteId);
+
 }

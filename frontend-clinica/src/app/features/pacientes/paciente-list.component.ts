@@ -12,14 +12,23 @@ import { Paciente } from '../../core/models/paciente.model';
     <div class="p-6 md:p-10 max-w-7xl mx-auto">
       
       <div class="flex justify-between items-center mb-6">
-        <h2 class="text-3xl font-bold text-gray-800">
-          Lista de Pacientes
-        </h2>
-        <button routerLink="/pacientes/nuevo" 
-                class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg shadow-md transition-colors duration-200">
-          Nuevo Paciente
-        </button>
-      </div>
+  <h2 class="text-3xl font-bold text-gray-800">
+    Lista de Pacientes
+  </h2>
+
+  <div class="flex gap-3">
+    <button routerLink="/pacientes/nuevo"
+            class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg shadow-md transition-colors duration-200">
+      ➕ Nuevo Paciente
+    </button>
+
+    <button routerLink="/pacientes/chat"
+            class="bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-lg shadow-md transition-colors duration-200">
+      💬 Chat con IA
+    </button>
+  </div>
+</div>
+
 
       <div class="shadow-lg rounded-lg overflow-hidden border border-gray-200">
         <table class="min-w-full divide-y divide-gray-200">
