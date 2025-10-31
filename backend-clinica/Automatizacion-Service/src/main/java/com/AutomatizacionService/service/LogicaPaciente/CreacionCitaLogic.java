@@ -4,9 +4,11 @@ import com.AutomatizacionService.client.CitaClient;
 import com.AutomatizacionService.model.CitaRequest;
 import com.AutomatizacionService.model.SugerenciaPendiente;
 import com.AutomatizacionService.repository.SugerenciaPendienteRepository;
+import com.AutomatizacionService.service.SugerenciaCacheService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
@@ -21,22 +23,40 @@ public class CreacionCitaLogic {
     @Autowired
     private SugerenciaPendienteRepository sugerenciaPendienteRepository;
 
+    @Autowired
+    private SugerenciaCacheService cache;
+
     /**
      * 🧠 Crea una cita médica a partir de la decisión generada por la IA.
-     * La IA ya devuelve el id del médico correcto según la lista de especialidades reales.
+     * Asegura valores válidos y recupera datos faltantes desde contexto.
      */
     public Map<String, Object> crearCitaDesdeDecision(Map<String, Object> decision, Long pacienteId,
                                                       List<Map<String, Object>> medicos) {
         try {
-            // Datos que devuelve la IA
-            String especialidad = decision.getOrDefault("especialidad", "Medicina General").toString();
-            String fecha = decision.getOrDefault("fecha", java.time.LocalDate.now().plusDays(1).toString()).toString();
-            String hora = decision.getOrDefault("hora", "09:00").toString();
-            Long medicoId = Long.valueOf(decision.getOrDefault("medicoId", "0").toString());
+            // 📦 Extraer campos base
+            String especialidad = safeString(decision.get("especialidad"), "Medicina General");
+            String fecha = safeString(decision.get("fecha"), LocalDate.now().plusDays(1).toString());
+            String hora = safeString(decision.get("hora"), "09:00");
 
-            // Validaciones básicas
-            if (medicoId == 0) {
-                throw new IllegalArgumentException("❌ La IA no devolvió un ID de médico válido.");
+            // 📌 Recuperar medicoId de forma segura
+            Long medicoId = safeLong(decision.get("medicoId"));
+            if (medicoId == null || medicoId == 0) {
+                Object ctxMed = cache.obtenerDatoContexto(pacienteId, "medicoId");
+                if (ctxMed instanceof Number num) {
+                    medicoId = num.longValue();
+                    System.out.println("🔄 Reforzando medicoId desde contexto: " + medicoId);
+                } else {
+                    throw new IllegalArgumentException("❌ No se pudo determinar el médico para la cita.");
+                }
+            }
+
+            // 📌 Recuperar especialidad si está vacía
+            if (especialidad.isBlank()) {
+                Object ctxEsp = cache.obtenerDatoContexto(pacienteId, "especialidad");
+                if (ctxEsp != null) {
+                    especialidad = ctxEsp.toString();
+                    System.out.println("🔄 Reforzando especialidad desde contexto: " + especialidad);
+                }
             }
 
             // --- Validar hora --- //
@@ -45,8 +65,8 @@ public class CreacionCitaLogic {
                 hora = "09:00";
             }
 
-// --- Construir fecha-hora en formato ISO --- //
-            String fechaHoraTexto = fecha + "T" + hora + ":00"; // ejemplo: 2025-10-30T09:00:00
+            // --- Construir fecha-hora en formato ISO --- //
+            String fechaHoraTexto = fecha + "T" + hora + ":00";
             LocalDateTime fechaHora = LocalDateTime.parse(fechaHoraTexto, DateTimeFormatter.ISO_LOCAL_DATE_TIME);
 
             System.out.println("🩺 [IA] Asignando cita automáticamente...");
@@ -54,23 +74,25 @@ public class CreacionCitaLogic {
             System.out.println("👨‍⚕️ Médico ID: " + medicoId);
             System.out.println("📅 FechaHora: " + fechaHora);
 
-            // Crear cita en el microservicio de citas
+            // ✅ Crear cita en microservicio
             CitaRequest cita = new CitaRequest(pacienteId, medicoId, fechaHora);
             citaClient.crearCita(cita);
 
-            // Registrar sugerencia de la IA
+            // 💾 Guardar sugerencia
             sugerenciaPendienteRepository.save(SugerenciaPendiente.builder()
                     .pacienteId(pacienteId)
                     .medicoId(medicoId)
                     .fecha(fecha)
                     .hora(hora)
+                    .especialidad(especialidad)
                     .mensaje("Cita creada automáticamente por IA")
                     .confirmada(true)
                     .build());
 
-            System.out.println("✅ [OK] Cita creada correctamente por IA para paciente " + pacienteId);
+            System.out.println("✅ [OK] Cita creada correctamente para paciente " + pacienteId);
             return Map.of(
-                    "mensaje", "Cita creada automáticamente",
+                    "mensaje", "✅ Cita creada con éxito para el " + fecha + " a las " + hora +
+                            " con el especialista en " + especialidad + ".",
                     "especialidad", especialidad,
                     "medicoId", medicoId,
                     "fecha", fecha,
@@ -83,6 +105,26 @@ public class CreacionCitaLogic {
                     "error", "⚠️ No se pudo crear la cita automáticamente.",
                     "detalle", e.getMessage()
             );
+        }
+    }
+
+    // ====== 🔧 Helpers ======
+
+    private String safeString(Object value, String defaultValue) {
+        if (value == null) return defaultValue;
+        String s = value.toString().trim();
+        return s.isEmpty() ? defaultValue : s;
+    }
+
+    private Long safeLong(Object value) {
+        try {
+            if (value == null) return null;
+            if (value instanceof Number num) return num.longValue();
+            String str = value.toString().trim();
+            if (str.isEmpty()) return null;
+            return Long.parseLong(str);
+        } catch (Exception e) {
+            return null;
         }
     }
 }

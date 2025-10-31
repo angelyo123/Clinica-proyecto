@@ -2,6 +2,7 @@ package com.AutomatizacionService.service.conversacionIA;
 
 import com.AutomatizacionService.client.HorarioClient;
 import com.AutomatizacionService.client.MedicoClient;
+import com.AutomatizacionService.model.CitaDecisionDTO;
 import com.AutomatizacionService.service.DeepSeekService;
 import com.AutomatizacionService.service.LogicaPaciente.AnalisisSintomasLogic;
 import com.AutomatizacionService.service.SugerenciaCacheService;
@@ -11,6 +12,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.text.Normalizer;
+import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
@@ -37,25 +39,36 @@ public class ConversacionPacienteService {
             // 1) Contexto previo
             String contexto = cache.obtenerContextoConversacion(pacienteId);
 
+
             // 2) Prompt IA (libre y contextual)
             String prompt = """
-Eres un asistente médico virtual empático que conversa con pacientes en lenguaje natural.
-Tu rol es interpretar el mensaje y decidir la acción adecuada (crear cita, confirmar, cancelar, consultar, etc.).
-No respondas con texto fuera del JSON.
+Eres un asistente médico virtual empático y experto en comprensión semántica.
+Tu tarea es entender el mensaje del paciente, incluso si contiene errores ortográficos o símbolos extraños.
 
-Estructura JSON esperada:
+A continuación tienes la lista REAL de médicos registrados en el sistema (extraída directamente de la base de datos).
+Cada médico incluye su nombre, especialidad y ID:
+
+%s
+
+Tu rol es analizar el mensaje del paciente y decidir:
+- Si menciona una especialidad, corrígela o identifica cuál es la más parecida en la lista.
+- Si menciona un síntoma (por ejemplo, "me duele el pecho"), infiere qué especialidad corresponde según los médicos disponibles.
+- Si pide una cita o información, responde de manera natural pero clara.
+- Siempre que sea posible, asocia la acción a un médico existente (usa su ID).
+- Si el paciente menciona un nombre de médico que ya apareció antes, asume que se refiere a ese mismo médico.
+
+Tu respuesta DEBE ser JSON con esta estructura EXACTA:
 {
   "respuesta": "mensaje natural para el paciente",
   "accion": "crear_cita | confirmar_cita | cancelar_cita | consultar_horarios | recomendacion | otra",
-  "especialidad": "si aplica",
+  "especialidad": "nombre corregido o inferido",
   "parametros": { "fecha": "", "hora": "", "medicoId": "" }
 }
 
-Contexto previo:
-%s
-
 Paciente dice: "%s"
-""".formatted(contexto, mensaje);
+""".formatted(obtenerContextoMedicos(), mensaje);
+
+
 
             String respuestaIA = deepSeekService.generarTexto(prompt);
             JsonNode root = mapper.readTree(respuestaIA);
@@ -138,9 +151,10 @@ Paciente dice: "%s"
                         }
                     }
 
-                    // 🔄 Ahora sí combinar datos
+                    // 🔄 Combinar datos con la solicitud original
                     solicitud.putAll(decision);
 
+                    // Extraer datos principales
                     Long medicoFinal = null;
                     Object medicoRef = decision.get("medicoId");
                     if (medicoRef instanceof Number num) medicoFinal = num.longValue();
@@ -158,12 +172,24 @@ Paciente dice: "%s"
                         );
                     }
 
-                    solicitud.put("medicoId", medicoFinal);
-                    solicitud.put("especialidad", decision.get("especialidad"));
+                    // 🧠 Crear DTO con datos consolidados
+                    CitaDecisionDTO dto = new CitaDecisionDTO(
+                            pacienteId,
+                            medicoFinal,
+                            String.valueOf(decision.get("especialidad")),
+                            String.valueOf(decision.getOrDefault("fecha", LocalDate.now().plusDays(1).toString())),
+                            String.valueOf(decision.getOrDefault("hora", "09:00")),
+                            "Cita gestionada automáticamente por IA"
+                    );
 
-                    System.out.println("🧠 Propagando datos corregidos a AnalisisSintomasLogic → medicoId=" + medicoFinal);
-                    yield analisisSintomasLogic.procesarMensajePaciente(solicitud);
+                    System.out.println("🧠 Propagando datos corregidos a AnalisisSintomasLogic → " +
+                            "medicoId=" + medicoFinal + ", especialidad=" + dto.getEspecialidad());
+
+                    // ✅ Llamada con el tipo correcto
+                    yield analisisSintomasLogic.procesarMensajePaciente(dto);
                 }
+
+
 
 
                 case "consultar_horarios" -> procesarConsultaHorarios(pacienteId, decision, mensaje);
@@ -176,10 +202,25 @@ Paciente dice: "%s"
         }
     }
 
+    private String obtenerContextoMedicos() {
+        try {
+            List<Map<String, Object>> medicos = medicoClient.listarMedicos();
+            StringBuilder sb = new StringBuilder();
+            for (Map<String, Object> m : medicos) {
+                sb.append(String.format("- %s → %s (ID: %s)%n",
+                        m.get("nombre"), m.get("especialidad"), m.get("id")));
+            }
+            return sb.toString();
+        } catch (Exception e) {
+            return "Sin datos médicos disponibles";
+        }
+    }
+
+
     // ===================== LÓGICA DE HORARIOS =====================
 
     private Map<String, Object> procesarConsultaHorarios(Long pacienteId, Map<String, Object> decision, String mensaje) {
-        // 1) Resolver o memorizar especialidad
+        // 1️⃣ Resolver o memorizar especialidad
         String especialidadRaw = String.valueOf(decision.getOrDefault("especialidad", "")).trim();
         if (!especialidadRaw.isBlank()) {
             cache.guardarDatoContexto(pacienteId, "especialidad", especialidadRaw);
@@ -188,14 +229,37 @@ Paciente dice: "%s"
             if (ctxEsp != null) especialidadRaw = String.valueOf(ctxEsp);
         }
 
-        // 2) Tomar medicoId sugerido por IA (si lo envía) o por contexto
         Long medicoIdSugerido = extraerMedicoId(decision);
         if (medicoIdSugerido == null) {
             Object ctxMed = cache.obtenerDatoContexto(pacienteId, "medicoId");
             if (ctxMed instanceof Number) medicoIdSugerido = ((Number) ctxMed).longValue();
         }
 
-        // 3) Normalizar especialidad para robustez (quita tildes/símbolos)
+        // 🔍 1.5 Detectar si el paciente mencionó un nombre o ID de un médico previamente listado
+        List<Map<String, Object>> opciones = (List<Map<String, Object>>) cache.obtenerDatoContexto(pacienteId, "opciones_medicos");
+        if (opciones != null && !opciones.isEmpty()) {
+            String msgLower = mensaje.toLowerCase();
+
+            for (Map<String, Object> m : opciones) {
+                String nombre = String.valueOf(m.get("nombre")).toLowerCase();
+                String apellido = String.valueOf(m.getOrDefault("apellido", "")).toLowerCase();
+                String idStr = String.valueOf(m.get("id"));
+
+                if (msgLower.contains(nombre) && (apellido.isBlank() || msgLower.contains(apellido)) || msgLower.contains(idStr)) {
+                    // ✅ Detectado médico por nombre o ID
+                    Long medicoDetectado = Long.parseLong(idStr);
+                    cache.guardarDatoContexto(pacienteId, "medicoId", medicoDetectado);
+                    System.out.println("✅ Médico identificado por mensaje: " + nombre + " " + apellido + " (ID " + medicoDetectado + ")");
+                    medicoIdSugerido = medicoDetectado;
+                    break;
+                }
+            }
+        }
+
+        // 2️⃣ Tomar medicoId sugerido por IA o del contexto
+
+
+        // 3️⃣ Normalizar especialidad (solo para robustez de búsqueda)
         String espNormalizada = normalizarEspecialidad(especialidadRaw);
 
         System.out.println("🔎 Especialidad recibida (raw): '" + especialidadRaw + "'");
@@ -204,34 +268,70 @@ Paciente dice: "%s"
 
         Map<String, Object> medicoSeleccionado = null;
 
-        // 4) Si IA trae medicoId, usarlo directo
+        // 4️⃣ Si IA ya trae médico, usarlo directo
         if (medicoIdSugerido != null) {
-            // (Opcional) si tienes endpoint para obtener médico por ID, úsalo aquí.
-            // Si no, continuamos directo a consultar horarios por ID.
-            medicoSeleccionado = Map.of("id", medicoIdSugerido, "nombre", ""); // placeholder para mensajes
+            medicoSeleccionado = Map.of(
+                    "id", medicoIdSugerido,
+                    "nombre", cache.obtenerDatoContexto(pacienteId, "nombreMedico") != null
+                            ? cache.obtenerDatoContexto(pacienteId, "nombreMedico").toString()
+                            : "el médico seleccionado"
+            );
+            // placeholder
         } else {
-            // 5) Buscar médicos por especialidad con intentos flexibles
+            // 5️⃣ Buscar médicos por especialidad
             medicoSeleccionado = resolverMedicoPorEspecialidadFlex(espNormalizada);
             if (medicoSeleccionado == null) {
                 String msgEsp = especialidadRaw.isBlank() ? "(sin especialidad indicada)" : especialidadRaw;
-                return Map.of("mensaje",
-                        "No encontré médicos disponibles para la especialidad: " + msgEsp + ".");
+                return Map.of("mensaje", "No encontré médicos disponibles para la especialidad: " + msgEsp + ".");
             }
-            medicoIdSugerido = ((Number) medicoSeleccionado.get("id")).longValue();
+
+            Object idObj = medicoSeleccionado.get("id");
+
+            // ⚙️ Verificar si se devolvió una lista de médicos
+            if (medicoSeleccionado.containsKey("medicos")) {
+                List<Map<String, Object>> lista = (List<Map<String, Object>>) medicoSeleccionado.get("medicos");
+
+                // Guardar lista en cache temporal
+                cache.guardarDatoContexto(pacienteId, "opciones_medicos", lista);
+
+                // Devolver mensaje natural con las opciones
+                return Map.of(
+                        "mensaje", medicoSeleccionado.get("mensaje"),
+                        "especialidad", medicoSeleccionado.get("especialidad"),
+                        "propuesta", true
+                );
+            }
+
+
+
+            if (idObj == null) idObj = medicoSeleccionado.get("medicoId");
+            if (idObj == null) idObj = medicoSeleccionado.get("idMedico");
+
+            if (idObj == null) {
+                System.out.println("⚠️ No se encontró 'id' en el médico seleccionado: " + medicoSeleccionado);
+                return Map.of("mensaje", "No se pudo identificar correctamente al médico de esa especialidad. Intenta nuevamente.");
+            }
+
+            medicoIdSugerido = Long.parseLong(idObj.toString());
             cache.guardarDatoContexto(pacienteId, "medicoId", medicoIdSugerido);
         }
 
-        // 6) Traer horarios del médico resuelto
+        // 6️⃣ Consultar horarios del médico
         List<Map<String, Object>> horarios = horarioClient.listarPorMedico(medicoIdSugerido);
         System.out.println("📅 Horarios obtenidos desde horario-service (medicoId=" + medicoIdSugerido + "): "
                 + (horarios != null ? horarios.size() : 0));
 
-        if (horarios == null || horarios.isEmpty()) {
+        if (horarios == null) {
+            return Map.of("mensaje", "⚠️ No se pudieron obtener horarios del sistema en este momento.");
+        }
+
+        if (horarios.isEmpty()) {
             String nombre = String.valueOf(medicoSeleccionado.getOrDefault("nombre", "el médico seleccionado"));
             return Map.of("mensaje", "El Dr./Dra. " + nombre + " no tiene horarios disponibles por ahora.");
         }
 
-        // 7) Unificar slots disponibles
+
+        // 7️⃣ Unificar todos los horarios disponibles
         List<String> disponibles = new ArrayList<>();
         for (Map<String, Object> h : horarios) {
             try {
@@ -244,27 +344,38 @@ Paciente dice: "%s"
             }
         }
 
-        // 8) Detectar si el paciente pidió una hora concreta
+        // 8️⃣ Detectar si el paciente pidió una hora concreta
         LocalTime horaConsultada = detectarHoraEnTexto(mensaje);
-
         String nombreMedico = String.valueOf(medicoSeleccionado.getOrDefault("nombre", "el médico seleccionado"));
+
         if (horaConsultada != null) {
             Optional<String> match = disponibles.stream()
                     .filter(h -> LocalTime.parse(h, timeFormatter).equals(horaConsultada))
                     .findFirst();
+
             if (match.isPresent()) {
-                return Map.of(
-                        "mensaje", "✅ Sí, hay disponibilidad a las " + horaConsultada.format(timeFormatter) +
-                                ". ¿Deseas que te agende con el Dr./Dra. " + nombreMedico + "?",
-                        "especialidad", especialidadRaw,
-                        "hora", horaConsultada.format(timeFormatter),
-                        "medicoId", medicoIdSugerido
+                String fecha = LocalDate.now().plusDays(1).toString();
+                String hora = horaConsultada.format(timeFormatter);
+
+                CitaDecisionDTO citaDecision = new CitaDecisionDTO(
+                        pacienteId,
+                        medicoIdSugerido,
+                        especialidadRaw,
+                        fecha,
+                        hora,
+                        "Creación automática de cita"
                 );
+
+                System.out.println("🤖 [IA] Creando cita con el Dr./Dra. " + nombreMedico +
+                        " (" + especialidadRaw + ") a las " + hora + " el " + fecha);
+
+                return analisisSintomasLogic.procesarMensajePaciente(citaDecision);
             } else {
+                // Si no hay match exacto, ofrecer hora más cercana
                 LocalTime sugerida = obtenerMasCercana(horaConsultada, disponibles);
                 return Map.of(
-                        "mensaje", "⏰ No hay disponibilidad exacta a las " + horaConsultada.format(timeFormatter) +
-                                ", pero puedo ofrecerte a las " + sugerida.format(timeFormatter) + ".",
+                        "mensaje", "⏰ No hay disponibilidad exacta a las " + horaConsultada.format(timeFormatter)
+                                + ", pero puedo ofrecerte a las " + sugerida.format(timeFormatter) + ".",
                         "especialidad", especialidadRaw,
                         "hora", sugerida.format(timeFormatter),
                         "medicoId", medicoIdSugerido
@@ -272,32 +383,69 @@ Paciente dice: "%s"
             }
         }
 
-        // 9) Si no se mencionó hora, listar todo
+        // 9️⃣ Si no se pidió hora → tomar el primer horario disponible y crear cita automáticamente
+        if (!disponibles.isEmpty()) {
+            String horariosTexto = String.join(", ", disponibles);
+
+            String mensajeIA = "El Dr./Dra. " + nombreMedico +
+                    " tiene horarios disponibles a: " + horariosTexto +
+                    ". ¿En cuál de esos horarios deseas tu cita?";
+
+            // Guardamos lista de horarios en cache para la siguiente interacción
+            cache.guardarDatoContexto(pacienteId, "horarios_disponibles", disponibles);
+            cache.guardarDatoContexto(pacienteId, "medicoId", medicoIdSugerido);
+            cache.guardarDatoContexto(pacienteId, "especialidad", especialidadRaw);
+
+            return Map.of(
+                    "mensaje", mensajeIA,
+                    "especialidad", especialidadRaw,
+                    "medicoId", medicoIdSugerido,
+                    "propuesta", true
+            );
+        }
+
+        // 🔚 Si por alguna razón no hay horarios (fallback)
         return Map.of(
-                "mensaje", "El Dr./Dra. " + nombreMedico + " tiene horarios disponibles a: " +
-                        String.join(", ", disponibles),
+                "mensaje", "No se pudo determinar un horario válido para la especialidad " + especialidadRaw + ".",
                 "especialidad", especialidadRaw,
                 "medicoId", medicoIdSugerido
         );
     }
 
+
     // --------- Resolución flexible de médico por especialidad + logging ----------
     private Map<String, Object> resolverMedicoPorEspecialidadFlex(String especialidadNormalizada) {
-        // Intentos de búsqueda con diferentes variantes del texto
         List<String> candidatos = variantesEspecialidad(especialidadNormalizada);
 
         for (String cand : candidatos) {
             List<Map<String, Object>> medicos = medicoClient.listarPorEspecialidad(cand);
             System.out.println("🩺 Buscar por especialidad='" + cand + "': "
                     + (medicos != null ? medicos.size() : 0) + " resultado(s)");
+
             if (medicos != null && !medicos.isEmpty()) {
-                // Log detallado de lo que trae la BD (id/nombre/especialidad cruda)
+                // Log detallado
                 for (Map<String, Object> m : medicos) {
                     System.out.println("   • médico: id=" + m.get("id")
                             + ", nombre=" + m.get("nombre")
                             + ", especialidad_raw=" + m.get("especialidad"));
                 }
-                // Elegimos el primero (puedes cambiar a otra estrategia)
+
+                // Si hay varios médicos, devuelve todos con un mensaje natural
+                if (medicos.size() > 1) {
+                    StringBuilder sb = new StringBuilder("Encontré varios médicos en esa especialidad:\n");
+                    for (Map<String, Object> m : medicos) {
+                        sb.append("• ").append(m.get("nombre")).append(" ").append(m.getOrDefault("apellido", ""))
+                                .append(" (ID ").append(m.get("id")).append(")\n");
+                    }
+                    sb.append("¿Con cuál deseas consultar los horarios?");
+                    return Map.of(
+                            "medicos", medicos,
+                            "mensaje", sb.toString(),
+                            "especialidad", especialidadNormalizada
+                    );
+                }
+
+                // Si solo hay uno, devolver directamente el médico
                 return medicos.get(0);
             }
         }

@@ -3,6 +3,7 @@ package com.AutomatizacionService.service.LogicaPaciente;
 import com.AutomatizacionService.client.HorarioClient;
 import com.AutomatizacionService.client.MedicoClient;
 import com.AutomatizacionService.client.PacienteClient;
+import com.AutomatizacionService.model.CitaDecisionDTO;
 import com.AutomatizacionService.model.SugerenciaPendiente;
 import com.AutomatizacionService.repository.SugerenciaPendienteRepository;
 import com.AutomatizacionService.service.DeepSeekService;
@@ -20,7 +21,6 @@ import java.util.Map;
 @Service
 public class AnalisisSintomasLogic {
 
-    @Autowired private DeepSeekService deepSeekService;
     @Autowired private CreacionCitaLogic creacionCitaLogic;
     @Autowired private ConfirmacionCitaLogic confirmacionCitaLogic;
     @Autowired private CancelacionCitaLogic cancelacionCitaLogic;
@@ -28,100 +28,65 @@ public class AnalisisSintomasLogic {
     @Autowired private SugerenciaPendienteRepository repo;
     @Autowired private HorarioClient horarioClient;
 
-    private final ObjectMapper mapper = new ObjectMapper();
-
     /**
-     * 🧠 Procesa el mensaje libre del paciente y decide qué hacer según la IA de DeepSeek.
+     * 🧠 Procesa el mensaje del paciente (ya analizado por la IA)
+     * y actúa según la intención: crear, confirmar o cancelar.
      */
-    public Map<String, Object> procesarMensajePaciente(Map<String, Object> solicitud) {
+    public Map<String, Object> procesarMensajePaciente(CitaDecisionDTO solicitud) {
         try {
-            Long pacienteId = Long.valueOf(solicitud.get("pacienteId").toString());
-            String mensaje = solicitud.get("mensaje").toString();
+            Long pacienteId = solicitud.getPacienteId();
+            String mensaje = solicitud.getMensaje() != null ? solicitud.getMensaje() : "";
+            String especialidad = solicitud.getEspecialidad() != null ? solicitud.getEspecialidad() : "";
+            String fecha = solicitud.getFecha() != null ? solicitud.getFecha() : "";
+            String hora = solicitud.getHora() != null ? solicitud.getHora() : "";
+            Long medicoId = solicitud.getMedicoId();
 
             System.out.println("🤖 [IA] Analizando mensaje del paciente: " + mensaje);
 
-            // 🧩 1. Enviar texto a DeepSeek
-            String respuestaIA = deepSeekService.generarTexto("""
-    Eres un asistente médico digital que ayuda a pacientes a gestionar sus citas médicas.
-    Tu tarea es ANALIZAR el mensaje del paciente y devolver un JSON con la intención detectada.
-    
-    Debes identificar:
-    - Si el paciente quiere CREAR, CONFIRMAR o CANCELAR una cita.
-    - La ESPECIALIDAD médica (por ejemplo: "Cardiología", "Dermatología", "Neurología", etc.).
-    - La FECHA y HORA, si las menciona (convierte a formato ISO: YYYY-MM-DD y HH:mm en 24h).
-    - El ID del médico (usa 1 si no tienes datos reales).
-    
-    Ejemplos:
-    1️⃣ "quiero una cita con un cardiólogo mañana a las 9am" =>
-        {
-          "intencion": "crear_cita",
-          "especialidad": "Cardiología",
-          "fecha": "2025-10-31",
-          "hora": "09:00",
-          "medicoId": 1
-        }
-    2️⃣ "sí, confirmo mi cita con el dermatólogo" =>
-        {
-          "intencion": "confirmar_cita"
-        }
-    3️⃣ "no podré asistir a mi cita" =>
-        {
-          "intencion": "cancelar_cita"
-        }
+            // 🧩 1️⃣ Reforzar datos faltantes desde contexto
+            if (especialidad.isBlank()) {
+                Object ctxEsp = cache.obtenerDatoContexto(pacienteId, "especialidad");
+                if (ctxEsp != null) {
+                    especialidad = ctxEsp.toString();
+                    System.out.println("🔄 Reforzando especialidad desde contexto: " + especialidad);
+                }
+            }
 
-    ⚠️ IMPORTANTE:
-    - Devuelve SOLO JSON (sin texto extra).
-    - Si no puedes identificar algo, deja el campo vacío.
-    
-    Mensaje del paciente: "%s"
-    """.formatted(mensaje));
+            if (medicoId == null || medicoId == 0) {
+                Object ctxMed = cache.obtenerDatoContexto(pacienteId, "medicoId");
+                if (ctxMed instanceof Number num) {
+                    medicoId = num.longValue();
+                    System.out.println("🔄 Reforzando medicoId desde contexto: " + medicoId);
+                }
+            }
 
-            System.out.println("🧠 Respuesta IA: " + respuestaIA);
-
-            JsonNode root = mapper.readTree(respuestaIA);
-            String contenido = root.path("choices").get(0).path("message").path("content").asText();
-            Map<String, Object> decision = mapper.readValue(contenido, Map.class);
-            String intencion = decision.getOrDefault("intencion", "").toString().toLowerCase();
-
-
-
-            String fecha = decision.getOrDefault("fecha", "").toString();
-            String hora = decision.getOrDefault("hora", "").toString();
-            Long medicoId = Long.valueOf(decision.get("medicoId").toString());
-
-// 🕒 Si la IA no detectó una fecha, sugerir una en base a horarios disponibles
-            if (fecha.isEmpty()) {
+            // 🕒 Si no hay fecha → sugerir próxima disponible
+            if (fecha.isBlank()) {
                 try {
                     List<Map<String, Object>> horarios = horarioClient.listarPorMedico(medicoId);
-                    System.out.println("📅 Horarios obtenidos desde horario-service: " + horarios.size());
+                    System.out.println("📅 Horarios obtenidos desde horario-service: " +
+                            (horarios != null ? horarios.size() : 0));
 
-                    if (horarios == null || horarios.isEmpty()) {
-                        // 🚨 Sin horarios registrados para ese médico
+                    if (horarios == null) {
                         return Map.of(
-                                "mensaje", "😕 Lo siento, no hay horarios disponibles con la especialidad de "
-                                        + decision.get("especialidad") + ".",
-                                "propuesta", false,
-                                "decisionIA", decision
+                                "mensaje", "⚠️ No se pudieron obtener los horarios del médico seleccionado.",
+                                "propuesta", false
                         );
                     }
 
-                    // Filtrar los disponibles
+                    if (horarios.isEmpty()) {
+                        return Map.of(
+                                "mensaje", "😕 El médico no tiene horarios configurados por ahora.",
+                                "propuesta", false
+                        );
+                    }
+
+                    // ✅ Elegir el primer horario disponible
                     Map<String, Object> horarioDisponible = horarios.stream()
                             .filter(h -> Boolean.TRUE.equals(h.get("disponible")))
                             .findFirst()
-                            .orElse(null);
+                            .orElse(horarios.get(0));
 
-                    if (horarioDisponible == null) {
-                        // 🚫 Ningún horario activo
-                        return Map.of(
-                                "mensaje", "😕 Actualmente no hay citas disponibles para "
-                                        + decision.get("especialidad") + ". Inténtalo más tarde.",
-                                "propuesta", false,
-                                "decisionIA", decision
-                        );
-                    }
-
-                    // ✅ Hay horario disponible → sugerir fecha
                     String diaSemana = horarioDisponible.get("diaSemana").toString();
                     fecha = obtenerProximaFecha(diaSemana);
                     hora = horarioDisponible.get("horaInicio").toString();
@@ -131,61 +96,51 @@ public class AnalisisSintomasLogic {
                 } catch (Exception e) {
                     System.err.println("❌ Error al consultar horarios del médico: " + e.getMessage());
                     return Map.of(
-                            "mensaje", "⚠️ No se pudieron obtener los horarios de la especialidad "
-                                    + decision.get("especialidad") + ".",
-                            "propuesta", false,
-                            "decisionIA", decision
+                            "mensaje", "⚠️ No se pudieron obtener los horarios de la especialidad " + especialidad + ".",
+                            "propuesta", false
                     );
                 }
             }
 
+            // 🧩 2️⃣ Decidir acción según intención
+            String intencion = mensaje.toLowerCase();
 
+            if (intencion.contains("crear") || intencion.contains("agendar") || intencion.contains("cita")) {
+                // ✅ Crear cita
+                repo.save(SugerenciaPendiente.builder()
+                        .pacienteId(pacienteId)
+                        .medicoId(medicoId)
+                        .fecha(fecha)
+                        .hora(hora)
+                        .especialidad(especialidad)
+                        .mensaje("Propuesta de cita: " + mensaje)
+                        .confirmada(false)
+                        .build());
 
-            // 🧩 3. Redirigir según intención
-            switch (intencion) {
-                case "crear_cita" -> {
-                    // 🔄 Actualizar el mapa con la fecha/hora corregidas
-                    decision.put("fecha", fecha);
-                    decision.put("hora", hora);
-
-                    // 💾 Guardar sugerencia temporal en Redis
-                    cache.guardarSugerencia(pacienteId, decision);
-
-                    // 🗂 Guardar en BD para persistencia
-                    repo.save(SugerenciaPendiente.builder()
-                            .pacienteId(pacienteId)
-                            .medicoId(medicoId)
-                            .fecha(fecha)
-                            .hora(hora)
-                            .especialidad(decision.get("especialidad").toString())
-                            .mensaje("Propuesta de cita: " + mensaje)
-                            .confirmada(false)
-                            .build());
-
-                    return Map.of(
-                            "mensaje", "💬 Te propongo una cita con " + decision.get("especialidad") +
-                                    " el " + fecha + " a las " + hora + ". ¿Deseas confirmarla?",
-                            "propuesta", true,
-                            "decisionIA", decision
-                    );
-                }
-
-
-                case "confirmar_cita" -> {
-                    return confirmacionCitaLogic.procesarConfirmacion(solicitud);
-                }
-
-                case "cancelar_cita" -> {
-                    return cancelacionCitaLogic.procesarCancelacion(solicitud);
-                }
-
-                default -> {
-                    return Map.of(
-                            "mensaje", "🤔 No entendí tu solicitud. ¿Deseas crear, confirmar o cancelar una cita?",
-                            "intencionDetectada", intencion
-                    );
-                }
+                return creacionCitaLogic.crearCitaDesdeDecision(
+                        Map.of(
+                                "especialidad", especialidad,
+                                "fecha", fecha,
+                                "hora", hora,
+                                "medicoId", medicoId
+                        ),
+                        pacienteId,
+                        null
+                );
             }
+
+            if (intencion.contains("confirmar")) {
+                return confirmacionCitaLogic.procesarConfirmacion(solicitud);
+            }
+
+            if (intencion.contains("cancelar") || intencion.contains("anular")) {
+                return cancelacionCitaLogic.procesarCancelacion(solicitud);
+            }
+
+            // 🧩 3️⃣ Por defecto
+            return Map.of(
+                    "mensaje", "🤔 No entendí tu solicitud. ¿Deseas crear, confirmar o cancelar una cita?"
+            );
 
         } catch (Exception e) {
             e.printStackTrace();
@@ -212,7 +167,6 @@ public class AnalisisSintomasLogic {
         int diasHastaObjetivo = (objetivo.getValue() - hoy.getDayOfWeek().getValue() + 7) % 7;
         if (diasHastaObjetivo == 0) diasHastaObjetivo = 7; // siguiente semana si es el mismo día
 
-        LocalDate proxima = hoy.plusDays(diasHastaObjetivo);
-        return proxima.toString();
+        return hoy.plusDays(diasHastaObjetivo).toString();
     }
 }

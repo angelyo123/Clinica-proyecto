@@ -1,5 +1,6 @@
 package com.AutomatizacionService.controller;
 
+import com.AutomatizacionService.model.CitaDecisionDTO;
 import com.AutomatizacionService.service.orquestador.SugerenciaIAService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -24,7 +25,7 @@ public class SugerenciaController {
      * }
      */
     @PostMapping("/paciente")
-    public ResponseEntity<Map<String, Object>> procesarPaciente(@RequestBody Map<String, Object> solicitud) {
+    public ResponseEntity<Map<String, Object>> procesarPaciente(@RequestBody CitaDecisionDTO solicitud) {
         return ResponseEntity.ok(sugerenciaIAService.procesarPaciente(solicitud));
     }
 
@@ -50,7 +51,7 @@ public class SugerenciaController {
      * }
      */
     @PostMapping("/confirmacion")
-    public ResponseEntity<Map<String, Object>> procesarConfirmacion(@RequestBody Map<String, Object> solicitud) {
+    public ResponseEntity<Map<String, Object>> procesarConfirmacion(@RequestBody CitaDecisionDTO solicitud) {
         return ResponseEntity.ok(sugerenciaIAService.procesarConfirmacion(solicitud));
     }
 
@@ -63,7 +64,7 @@ public class SugerenciaController {
      * }
      */
     @PostMapping("/cancelacion")
-    public ResponseEntity<Map<String, Object>> procesarCancelacion(@RequestBody Map<String, Object> solicitud) {
+    public ResponseEntity<Map<String, Object>> procesarCancelacion(@RequestBody CitaDecisionDTO solicitud) {
         return ResponseEntity.ok(sugerenciaIAService.procesarCancelacion(solicitud));
     }
 

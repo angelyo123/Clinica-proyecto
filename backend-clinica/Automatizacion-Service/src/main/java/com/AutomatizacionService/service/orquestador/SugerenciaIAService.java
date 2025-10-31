@@ -1,5 +1,6 @@
 package com.AutomatizacionService.service.orquestador;
 
+import com.AutomatizacionService.model.CitaDecisionDTO;
 import com.AutomatizacionService.service.LogicaMedico.RegistroHorarioLogic;
 import com.AutomatizacionService.service.LogicaPaciente.AnalisisSintomasLogic;
 import com.AutomatizacionService.service.LogicaPaciente.CancelacionCitaLogic;
@@ -27,7 +28,7 @@ public class SugerenciaIAService {
 
 
     // 🧠 PACIENTE
-    public Map<String, Object> procesarPaciente(Map<String, Object> solicitud) {
+    public Map<String, Object> procesarPaciente(CitaDecisionDTO solicitud) {
         return wrapLogic(() -> analisisSintomasLogic.procesarMensajePaciente(solicitud), "AnalisisSintomasLogic");
     }
 
@@ -37,12 +38,12 @@ public class SugerenciaIAService {
     }
 
     // ✅ CONFIRMACIÓN
-    public Map<String, Object> procesarConfirmacion(Map<String, Object> solicitud) {
+    public Map<String, Object> procesarConfirmacion(CitaDecisionDTO solicitud) {
         return wrapLogic(() -> confirmacionCitaLogic.procesarConfirmacion(solicitud), "ConfirmacionCitaLogic");
     }
 
     // ❌ CANCELACIÓN
-    public Map<String, Object> procesarCancelacion(Map<String, Object> solicitud) {
+    public Map<String, Object> procesarCancelacion(CitaDecisionDTO solicitud) {
         return wrapLogic(() -> cancelacionCitaLogic.procesarCancelacion(solicitud), "CancelacionCitaLogic");
     }
 

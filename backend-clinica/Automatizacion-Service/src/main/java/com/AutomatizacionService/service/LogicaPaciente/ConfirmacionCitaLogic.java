@@ -1,6 +1,7 @@
 package com.AutomatizacionService.service.LogicaPaciente;
 
 import com.AutomatizacionService.client.CitaClient;
+import com.AutomatizacionService.model.CitaDecisionDTO;
 import com.AutomatizacionService.model.CitaRequest;
 import com.AutomatizacionService.model.SugerenciaPendiente;
 import com.AutomatizacionService.repository.SugerenciaPendienteRepository;
@@ -24,10 +25,10 @@ public class ConfirmacionCitaLogic {
 
     private final ObjectMapper mapper = new ObjectMapper();
 
-    public Map<String, Object> procesarConfirmacion(Map<String, Object> solicitud) {
+    public Map<String, Object> procesarConfirmacion(CitaDecisionDTO solicitud) {
         try {
-            Long pacienteId = Long.valueOf(solicitud.get("pacienteId").toString());
-            String mensaje = solicitud.get("mensaje").toString();
+            Long pacienteId = solicitud.getPacienteId();
+            String mensaje = solicitud.getMensaje() != null ? solicitud.getMensaje() : "";
 
             System.out.println("🤖 [IA] Analizando confirmación del paciente: " + mensaje);
 
