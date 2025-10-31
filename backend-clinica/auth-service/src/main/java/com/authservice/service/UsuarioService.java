@@ -33,11 +33,6 @@ public class UsuarioService {
         return usuarioRepository.findAll();
     }
 
-    public List<Usuario> listarTodos() {
-        return usuarioRepository.findAll();
-    }
-
-
     public Usuario registrarPaciente(RegistroPacienteRequest request) {
 
         Usuario usuario = new Usuario();

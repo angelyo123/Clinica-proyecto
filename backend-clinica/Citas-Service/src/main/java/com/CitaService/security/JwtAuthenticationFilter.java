@@ -18,6 +18,7 @@ import java.util.stream.Collectors;
 @Component
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
+
     private final JwtUtil jwtUtil;
 
     public JwtAuthenticationFilter(JwtUtil jwtUtil) {
@@ -37,14 +38,17 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             return;
         }
 
+
         String token = authHeader.substring(7);
         String username = jwtUtil.extractUsername(token);
+
 
         if (username != null && jwtUtil.isTokenValid(token)
                 && SecurityContextHolder.getContext().getAuthentication() == null) {
 
             List<String> roles = jwtUtil.extractRoles(token);
             var authorities = roles.stream()
+                    .map(role -> role.startsWith("ROLE_") ? role : "ROLE_" + role)
                     .map(SimpleGrantedAuthority::new)
                     .collect(Collectors.toList());
 

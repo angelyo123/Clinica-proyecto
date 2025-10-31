@@ -145,7 +145,7 @@ public class HorarioController {
     }
 
     @GetMapping("/medico/{id}")
-    //@PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_MEDICO')")
+    @PreAuthorize("permitAll()")
     public ResponseEntity<List<Horario>> listarPorMedico(@PathVariable Long id) {
         return ResponseEntity.ok(horarioService.listarPorMedico(id));
     }

@@ -21,11 +21,11 @@ import java.util.stream.Collectors;
 @Component
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
-    @Autowired
-    private JwtUtil jwtUtil;
+    private final JwtUtil jwtUtil;
 
-    @Autowired
-    private UserDetailsService userDetailsService;
+    public JwtAuthenticationFilter(JwtUtil jwtUtil) {
+        this.jwtUtil = jwtUtil;
+    }
 
     @Override
     protected void doFilterInternal(HttpServletRequest request,
@@ -43,25 +43,21 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         String token = authHeader.substring(7);
         String username = jwtUtil.extractUsername(token);
 
-        // ⚠️ Solo si no hay autenticación previa
-        if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+        if (username != null && jwtUtil.isTokenValid(token)
+                && SecurityContextHolder.getContext().getAuthentication() == null) {
 
-            UserDetails userDetails = userDetailsService.loadUserByUsername(username);
-
-            if (jwtUtil.isTokenValid(token, userDetails)) {
-
-                List<String> roles = jwtUtil.extractRoles(token);
-                var authorities = roles.stream()
+            List<String> roles = jwtUtil.extractRoles(token);
+            var authorities = roles.stream()
                     .map(role -> role.startsWith("ROLE_") ? role : "ROLE_" + role)
-                        .map(SimpleGrantedAuthority::new)
-                        .collect(Collectors.toList());
+                    .map(SimpleGrantedAuthority::new)
+                    .collect(Collectors.toList());
 
-                UsernamePasswordAuthenticationToken authToken =
-                        new UsernamePasswordAuthenticationToken(userDetails, null, authorities);
-                authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+            UsernamePasswordAuthenticationToken authToken =
+                    new UsernamePasswordAuthenticationToken(username, token, authorities);
 
-                SecurityContextHolder.getContext().setAuthentication(authToken);
-            }
+            authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+
+            SecurityContextHolder.getContext().setAuthentication(authToken);
         }
 
         filterChain.doFilter(request, response);

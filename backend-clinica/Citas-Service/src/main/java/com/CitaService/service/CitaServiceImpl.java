@@ -35,8 +35,8 @@ public class CitaServiceImpl implements CitaService {
         System.out.println("🩺 [DEBUG] Intentando crear cita...");
         System.out.println("📦 Datos recibidos: " + cita);
 
-        Map<String, Object> paciente = null;
-        Map<String, Object> medico = null;
+        PacienteDTO paciente = null;
+        MedicoDTO medico = null;
 
         try {
             paciente = pacienteClient.obtener(cita.getIdPaciente());
@@ -87,8 +87,8 @@ public class CitaServiceImpl implements CitaService {
         Cita citaActualizada = citaRepository.save(cita);
 
         // 3. Obtén los detalles del médico y paciente
-        Map<String, Object> medico = medicoClient.obtener(citaActualizada.getIdMedico());
-        Map<String, Object> paciente = pacienteClient.obtener(citaActualizada.getIdPaciente());
+       MedicoDTO medico = medicoClient.obtener(citaActualizada.getIdMedico());
+        PacienteDTO paciente = pacienteClient.obtener(citaActualizada.getIdPaciente());
 
         // 4. Construye y retorna el CitaDTO
         CitaDTO dto = new CitaDTO();
@@ -152,8 +152,15 @@ public class CitaServiceImpl implements CitaService {
                 .collect(Collectors.toList());
     }
 
+
+
     @Override
     public CitaDTO crearDetalle(CitaDTO dto) {
+
+        System.out.println("📦 DTO recibido: " + dto);
+        System.out.println("🔍 pacienteId = " + dto.getPaciente().getId());
+        System.out.println("🔍 medicoId = " + dto.getMedico().getId());
+
         System.out.println("🩺 [DEBUG] Iniciando creación de cita con detalle...");
         System.out.println("📦 DTO recibido: " + dto);
 
@@ -165,8 +172,9 @@ public class CitaServiceImpl implements CitaService {
         Long medicoId = null;
         Long pacienteId = null;
         try {
-            medicoId = ((Number) dto.getMedico().get("id")).longValue();
-            pacienteId = ((Number) dto.getPaciente().get("id")).longValue();
+            // DESPUÉS
+            medicoId = dto.getMedico().getId();
+            pacienteId = dto.getPaciente().getId();
         } catch (Exception e) {
             System.out.println("⚠️ [WARN] Error al extraer IDs de médico/paciente del DTO:");
             e.printStackTrace();
@@ -179,8 +187,8 @@ public class CitaServiceImpl implements CitaService {
         System.out.println("   - Médico ID: " + medicoId);
         System.out.println("   - Paciente ID: " + pacienteId);
 
-        Map<String, Object> medico = null;
-        Map<String, Object> paciente = null;
+        MedicoDTO medico = null;
+        PacienteDTO paciente = null;
 
         try {
             medico = medicoClient.obtener(medicoId);
@@ -189,6 +197,7 @@ public class CitaServiceImpl implements CitaService {
             System.out.println("❌ [ERROR] Falló la consulta al microservicio de MÉDICOS:");
             e.printStackTrace();
         }
+
 
         try {
             paciente = pacienteClient.obtener(pacienteId);
@@ -224,11 +233,16 @@ public class CitaServiceImpl implements CitaService {
         Cita citaExistente = citaRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Cita no encontrada con id: " + id));
 
-        Long medicoId = ((Number) dto.getMedico().get("id")).longValue();
-        Long pacienteId = ((Number) dto.getPaciente().get("id")).longValue();
+        Long medicoId = dto.getMedico() != null ? dto.getMedico().getId() : null;
+        Long pacienteId = dto.getPaciente() != null ? dto.getPaciente().getId() : null;
 
-        Map<String, Object> medico = medicoClient.obtener(medicoId);
-        Map<String, Object> paciente = pacienteClient.obtener(pacienteId);
+
+        if (medicoId == null || pacienteId == null) {
+            throw new IllegalArgumentException("El médico o el paciente no tienen ID asignado.");
+        }
+
+        MedicoDTO medico = medicoClient.obtener(medicoId);
+        PacienteDTO paciente = pacienteClient.obtener(pacienteId);
         if (paciente == null || medico == null) {
             throw new IllegalArgumentException("Paciente o médico no válido");
         }
@@ -279,4 +293,14 @@ public class CitaServiceImpl implements CitaService {
                 })
                 .collect(Collectors.toList());
     }
+
+    @Override
+    public void cancelarCitasPorPaciente(Long pacienteId) {
+        List<Cita> citas = citaRepository.findByIdPaciente(pacienteId);
+        for (Cita cita : citas) {
+            cita.setEstado("CANCELADA");
+            citaRepository.save(cita);
+        }
+    }
+
 }

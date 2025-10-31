@@ -4,6 +4,7 @@ import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angula
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { CitaService } from '../../core/services/cita.service';
 import { Cita } from '../../core/models/cita.model';
+import { PacienteService } from '../../core/services/paciente.service';
 
 @Component({
   selector: 'app-cita-form',
@@ -125,7 +126,8 @@ export class CitaFormComponent implements OnInit {
     private citaService: CitaService,
     private route: ActivatedRoute,
     private router: Router,
-    private cdr: ChangeDetectorRef
+    private cdr: ChangeDetectorRef,
+    private pacienteService: PacienteService
   ) {}
 
   ngOnInit(): void {
@@ -170,53 +172,75 @@ export class CitaFormComponent implements OnInit {
       }
     }
     this.rolCargado = true;
+
+    if (!this.esAdmin) {
+  this.pacienteService.obtenerPerfil().subscribe({
+    next: (paciente) => {
+      if (paciente && paciente.id) {
+        this.form.patchValue({ pacienteId: paciente.id });
+        console.log('✅ Paciente logueado cargado:', paciente.id);
+      }
+    },
+    error: (err) => console.error('Error al obtener perfil del paciente:', err)
+  });
+}
+
     this.cdr.detectChanges();
   }
 
-  guardar(): void {
-    if (this.form.invalid) return;
+guardar(): void {
+  if (this.form.invalid) return;
 
-    // Si es médico y está editando, usar endpoint específico de estado
-    if (this.editMode && !this.esAdmin) {
-      const nuevoEstado: string = this.form.value.estado;
-      this.citaService.actualizarEstado(this.id, nuevoEstado).subscribe({
-        next: () => {
-          alert('Estado actualizado correctamente');
-          this.router.navigate(['/citas']);
-        },
-        error: (err) => {
-          console.error('Error al actualizar estado:', err);
-          alert('Ocurrió un error al actualizar el estado');
-        }
-      });
-      return;
-    }
-
-    // Flujos admin (o creación)
-    const cita: Cita = {
-      fechaHora: this.form.value.fechaHora,
-      estado: this.form.value.estado,
-      medico: this.form.value.medicoId ? { id: this.form.value.medicoId } : undefined,
-      paciente: this.form.value.pacienteId ? { id: this.form.value.pacienteId } : undefined
-    };
-
-    const request = this.editMode
-      ? this.citaService.actualizar(this.id, cita)
-      : this.citaService.crearCita(cita);
-
-    request.subscribe({
+  // Si es médico y está editando, usar endpoint específico de estado
+  if (this.editMode && !this.esAdmin) {
+    const nuevoEstado: string = this.form.value.estado;
+    this.citaService.actualizarEstado(this.id, nuevoEstado).subscribe({
       next: () => {
-        alert(this.editMode ? 'Cita actualizada correctamente' : 'Cita creada exitosamente');
-        this.router.navigate(['/citas']);
+        alert('Estado actualizado correctamente');
+        this.redirigirDespuesDeAccion(); // 👈 Redirección dinámica
       },
       error: (err) => {
-        console.error('Error al guardar cita:', err);
-        alert('Ocurrió un error al guardar la cita');
+        console.error('Error al actualizar estado:', err);
+        alert('Ocurrió un error al actualizar el estado');
       }
     });
+    return;
   }
 
-  cancelar(): void {
-    this.router.navigate(['/citas']);
+  // Flujos admin (o creación)
+  const cita: Cita = {
+    fechaHora: this.form.value.fechaHora,
+    estado: this.form.value.estado,
+    medico: this.form.value.medicoId ? { id: this.form.value.medicoId } : undefined,
+    paciente: this.form.value.pacienteId ? { id: this.form.value.pacienteId } : undefined
+  };
+
+  const request = this.editMode
+    ? this.citaService.actualizar(this.id, cita)
+    : this.citaService.crearCita(cita);
+
+  request.subscribe({
+    next: () => {
+      alert(this.editMode ? 'Cita actualizada correctamente' : 'Cita creada exitosamente');
+      this.redirigirDespuesDeAccion(); // 👈 Redirección dinámica
+    },
+    error: (err) => {
+      console.error('Error al guardar cita:', err);
+      alert('Ocurrió un error al guardar la cita');
+    }
+  });
+}
+
+cancelar(): void {
+  this.redirigirDespuesDeAccion(); // 👈 misma función usada aquí
+}
+
+/** 🔹 Nueva función: decide a dónde volver según el rol */
+private redirigirDespuesDeAccion(): void {
+  if (this.esAdmin) {
+    this.router.navigate(['/citas']); // admin → módulo general de citas
+  } else {
+    this.router.navigate(['/mis-citas-paciente']); // paciente → sus propias citas
   }
+}
 }

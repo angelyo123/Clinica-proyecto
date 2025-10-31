@@ -30,6 +30,7 @@ public class CitaController {
     }
 
     @PostMapping("/crear")
+    @PreAuthorize("permitAll()")
     public Cita crear(@RequestBody Cita cita) {
         return citaService.crear(cita);
     }
@@ -96,4 +97,19 @@ public class CitaController {
 
         return citaService.listarDetallesPorMedico(medicoId);
     }
+
+    @PutMapping("/cancelar/{id}")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_PACIENTE','ROLE_MEDICO')")
+    public ResponseEntity<CitaDTO> cancelarCita(@PathVariable Long id) {
+        CitaDTO citaCancelada = citaService.actualizarEstado(id, "CANCELADA");
+        return ResponseEntity.ok(citaCancelada);
+    }
+
+    @PutMapping("/cancelar/porPaciente/{pacienteId}")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_PACIENTE')")
+    public ResponseEntity<String> cancelarCitasPorPaciente(@PathVariable Long pacienteId) {
+        citaService.cancelarCitasPorPaciente(pacienteId);
+        return ResponseEntity.ok("Todas las citas del paciente han sido canceladas.");
+    }
+
 }

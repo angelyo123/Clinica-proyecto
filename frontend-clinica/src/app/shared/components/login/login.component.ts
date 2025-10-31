@@ -38,7 +38,7 @@ export class LoginComponent  {
       } else if (roles.includes('ROLE_MEDICO')) {
         this.router.navigate(['/mis-citas']); // 👈 NUEVO: redirige al panel de citas del médico
       } else if (roles.includes('ROLE_PACIENTE')) {
-        this.router.navigate(['/medicos']); // sigue igual
+        this.router.navigate(['/mis-citas-paciente']); // sigue igual
       } else {
         this.router.navigate(['/login']);
 }

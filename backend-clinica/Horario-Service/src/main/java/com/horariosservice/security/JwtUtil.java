@@ -19,22 +19,27 @@ public class JwtUtil {
         return Keys.hmacShaKeyFor(SECRET_KEY.getBytes());
     }
 
+    /** 🔹 Extrae el username (sub) del token */
     public String extractUsername(String token) {
         return extractAllClaims(token).getSubject();
     }
 
+    /** 🔹 Extrae los roles almacenados en el token */
     public List<String> extractRoles(String token) {
         return extractAllClaims(token).get("roles", List.class);
     }
 
-    public boolean isTokenValid(String token, UserDetails userDetails) {
+    /** 🔹 Valida que el token sea válido y no esté expirado */
+    public boolean isTokenValid(String token) {
         try {
-            return !extractAllClaims(token).getExpiration().before(new Date());
+            Claims claims = extractAllClaims(token);
+            return claims.getExpiration().after(new Date());
         } catch (Exception e) {
             return false;
         }
     }
 
+    /** 🔹 Extrae todas las claims del JWT */
     private Claims extractAllClaims(String token) {
         return Jwts.parserBuilder()
                 .setSigningKey(getSigningKey())

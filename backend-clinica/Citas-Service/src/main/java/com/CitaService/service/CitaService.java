@@ -22,4 +22,6 @@ public interface CitaService {
     CitaDTO actualizarDetalle(Long id, CitaDTO citaDTO);
     List<CitaDTO> listarDetallesPorPaciente(Long pacienteId);
     List<CitaDTO> listarDetallesPorMedico(Long medicoId); //
+
+    void cancelarCitasPorPaciente(Long pacienteId);
 }

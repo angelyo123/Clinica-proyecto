@@ -8,6 +8,8 @@ import { USUARIOS_ROUTES } from './features/usuarios/usuarios.routes';
 import { CITA_ROUTES } from './features/citas/citas.routes';
 import { RegisterComponent } from './shared/components/register/register.component';
 import { HORARIO_ROUTES } from './features/horarios/horario.routes';
+import { MisCitasComponent } from './features/citas/mis-citas/mis-citas.component';
+import { MedicosDisponiblesComponent } from './features/medicos/medicos-disponibles/medicos-disponibles.component';
 
 export const routes: Routes = [
   { path: '', redirectTo: 'login', pathMatch: 'full' },
@@ -22,5 +24,8 @@ export const routes: Routes = [
 
   { path: 'mis-citas', canActivate: [AuthGuard], loadComponent: () => import('./features/citas/cita-list.component').then(m => m.CitaListComponent) },
 { path: 'mis-horarios', canActivate: [AuthGuard], loadComponent: () => import('./features/horarios/horario-list.component').then(m => m.HorarioListComponent) },
+{ path: 'mis-citas-paciente', component: MisCitasComponent, canActivate: [AuthGuard] },
+{ path: 'medicos-disponibles', component: MedicosDisponiblesComponent },
+
 
 ];

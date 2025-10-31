@@ -42,7 +42,7 @@ public class SecurityConfig {
             // 🔒 Modo producción: seguridad normal
             http.authorizeHttpRequests(auth -> auth
                             .requestMatchers("/public/**").permitAll()
-                            .anyRequest().authenticated()
+                            .anyRequest().permitAll()
                     )
                     .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
         }

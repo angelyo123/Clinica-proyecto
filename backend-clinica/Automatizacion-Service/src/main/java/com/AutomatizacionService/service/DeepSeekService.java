@@ -34,7 +34,7 @@ public class DeepSeekService {
         Map<String, Object> body = Map.of(
                 "model", "deepseek-chat",
                 "messages", List.of(
-                        Map.of("role", "system", "content", "Eres un asistente útil y conciso."),
+                        Map.of("role", "system", "content", "Eres un asistente útil y conciso.Responde SOLO con un JSON válido sin explicaciones adicionales."),
                         Map.of("role", "user", "content", prompt)
                 )
         );

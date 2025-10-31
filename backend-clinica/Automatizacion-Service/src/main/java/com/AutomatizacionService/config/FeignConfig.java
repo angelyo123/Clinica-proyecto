@@ -1,22 +1,32 @@
 package com.AutomatizacionService.config;
 
+import com.AutomatizacionService.service.SystemAuthService;
 import feign.RequestInterceptor;
 import feign.RequestTemplate;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.context.SecurityContextHolder;
+
+
 
 @Configuration
 public class FeignConfig implements RequestInterceptor {
 
+    private final SystemAuthService systemAuthService;
+
+    public FeignConfig(SystemAuthService systemAuthService) {
+        this.systemAuthService = systemAuthService;
+    }
+
     @Override
     public void apply(RequestTemplate template) {
-        var auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth instanceof UsernamePasswordAuthenticationToken tokenAuth) {
-            Object credentials = tokenAuth.getCredentials();
-            if (credentials instanceof String token && token.startsWith("ey")) {
-                template.header("Authorization", "Bearer " + token);
-            }
+        String token = systemAuthService.getSystemToken();
+
+        // 🔐 Añadir cabeceras necesarias
+        template.header("Content-Type", "application/json");
+        if (token != null && !token.isBlank()) {
+            template.header("Authorization", "Bearer " + token);
+            System.out.println("🔐 Token IA enviado a Feign: " + token.substring(0, 30) + "...");
+        } else {
+            System.out.println("⚠️ Token IA ausente al enviar solicitud Feign");
         }
     }
 }

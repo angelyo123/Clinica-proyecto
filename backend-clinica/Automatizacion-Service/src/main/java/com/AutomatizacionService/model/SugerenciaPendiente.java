@@ -23,4 +23,5 @@ public class SugerenciaPendiente {
     @Column(length = 1000)
     private String mensaje;
     private boolean confirmada;
+    private String especialidad;
 }

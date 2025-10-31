@@ -24,21 +24,25 @@ public class SecurityConfig {
     public SecurityConfig(JwtAuthenticationFilter jwtAuthenticationFilter) {
         this.jwtAuthenticationFilter = jwtAuthenticationFilter;
     }
-
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
-        return http
-                .cors(cors -> cors.configurationSource(corsConfigurationSource())) // Asume que tienes CORS configurado
+        http
+                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(csrf -> csrf.disable())
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                            .requestMatchers("/paciente/crear").permitAll()
-                        .requestMatchers("/public/**").permitAll()
+                        // 🔓 Endpoints públicos (sin JWT)
+                        .requestMatchers("/auth/**", "/paciente/public/**", "/paciente/crear").permitAll()
+
+                        // 🔒 Todo lo demás requiere token
                         .anyRequest().authenticated()
                 )
-                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
-                .build();
+                // ⚠️ MUY IMPORTANTE: agrega este filtro solo después de definir permisos
+                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+
+        return http.build();
     }
+
 
     @Bean
     CorsConfigurationSource corsConfigurationSource() {
