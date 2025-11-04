@@ -14,4 +14,5 @@ import { Usuario } from "./usuario.model";
         telefono: string;
         dni: string;
         usuario?: string;
+        
     }

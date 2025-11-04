@@ -41,6 +41,7 @@ public class CitaController {
     }
 
     @GetMapping("/listarPorMedico")
+    @PreAuthorize("permitAll()")
     public ResponseEntity<List<Cita>> listarPorMedico(@RequestParam Long medicoId) {
         List<Cita> citas = citaService.listarPorMedico(medicoId);
         return ResponseEntity.ok(citas);
@@ -62,7 +63,7 @@ public class CitaController {
     }
 
     @GetMapping("/detallePorMedico")
-    @PreAuthorize("hasAnyAuthority('ROLE_MEDICO','ROLE_ADMIN')")
+    //@PreAuthorize("hasAnyAuthority('ROLE_MEDICO','ROLE_ADMIN')")
     public ResponseEntity<List<CitaMedicoDTO>> listarDetallePorMedico(@RequestParam Long medicoId) {
         return ResponseEntity.ok(citaService.listarCitasPorMedicoConPacientes(medicoId));
     }
@@ -91,7 +92,6 @@ public class CitaController {
     }
 
     @GetMapping("/listarPorMedico/detalles")
-    @PreAuthorize("hasAnyAuthority('ROLE_MEDICO', 'ROLE_ADMIN')")
     public List<CitaDTO> listarDetallesPorMedico(@RequestParam Long medicoId) {
 
         return citaService.listarDetallesPorMedico(medicoId);

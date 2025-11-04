@@ -1,4 +1,4 @@
-package com.AutomatizacionService.controller;
+package com.AutomatizacionService.controller.conversacionPaciente;
 
 import com.AutomatizacionService.service.conversacionIA.ConversacionPacienteService;
 import org.springframework.web.bind.annotation.PostMapping;

@@ -1,6 +1,7 @@
 package com.MedicoService.controller;
 
 import com.MedicoService.model.Medico;
+import com.MedicoService.service.MedicoChangeTracker;
 import com.MedicoService.service.MedicoService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -8,7 +9,9 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/medico")
@@ -17,7 +20,7 @@ public class MedicoController {
 
     @Autowired
     private MedicoService medicoService;
-
+    @Autowired private MedicoChangeTracker tracker;
     @GetMapping("/listar")
     public List<Medico> listar() {
         return medicoService.listar();
@@ -65,11 +68,31 @@ public class MedicoController {
         return ResponseEntity.ok(medico);
     }
 
-
-
     @GetMapping("/public/especialidad")
     public List<Medico> listarPorEspecialidad(@RequestParam String especialidad) {
         return medicoService.listarPorEspecialidad(especialidad);
+    }
+
+    @GetMapping("/public/cambios")
+    public Map<String, Object> verificarCambios(@RequestParam(required = false) String ultimaVersion) {
+        LocalDateTime actual = tracker.obtenerUltimaActualizacion();
+        boolean hayCambio = true;
+
+        if (ultimaVersion != null && !ultimaVersion.isBlank()) {
+            try {
+                LocalDateTime ultima = LocalDateTime.parse(ultimaVersion);
+                hayCambio = actual.isAfter(ultima); // ✅ comparación real de fechas
+            } catch (Exception e) {
+                hayCambio = true; // si hay error al parsear, forzamos actualización
+            }
+        }
+
+        System.out.println("🕓 Última en tracker: " + actual + " | Última conocida: " + ultimaVersion + " | Cambio=" + hayCambio);
+
+        return Map.of(
+                "cambio", hayCambio,
+                "ultimaVersion", actual.toString()
+        );
     }
 
 }

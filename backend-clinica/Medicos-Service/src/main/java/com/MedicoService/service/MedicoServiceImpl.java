@@ -20,6 +20,8 @@ public class MedicoServiceImpl implements MedicoService {
 
     @Autowired
     private AuthClient authClient;
+    @Autowired
+    private MedicoChangeTracker tracker;
 
     @Override
     public List<Medico> listar() {
@@ -40,6 +42,7 @@ public class MedicoServiceImpl implements MedicoService {
         Map<String, Object> response = authClient.registrarUsuarioMedico(request);
 
         medico.setUsuario(response.get("username").toString());
+        tracker.marcarCambio();
         return medicoRepository.save(medico);
     }
 
@@ -51,6 +54,7 @@ public class MedicoServiceImpl implements MedicoService {
             existente.setEspecialidad(medico.getEspecialidad());
             existente.setTelefono(medico.getTelefono());
             existente.setDni(medico.getDni());
+            tracker.marcarCambio();
             return medicoRepository.save(existente);
         }
         return null;
@@ -58,7 +62,9 @@ public class MedicoServiceImpl implements MedicoService {
 
     @Override
     public void eliminar(Long id) {
+
         medicoRepository.deleteById(id);
+        tracker.marcarCambio();
     }
 
     @Override

@@ -15,10 +15,7 @@ public interface MedicoClient {
     @GetMapping("/public/listar")
     List<Map<String, Object>> listarMedicos();
 
-    @GetMapping("/public/especialidad")
-    List<Map<String, Object>> listarPorEspecialidad(@RequestParam String especialidad);
-
-    @GetMapping("/obtener/{id}")
-    Map<String, Object> obtenerPorId(@PathVariable Long id);
+    @GetMapping("/public/cambios")
+    Map<String, Object> verificarCambios(@RequestParam(required = false) String ultimaVersion);
 
 }
