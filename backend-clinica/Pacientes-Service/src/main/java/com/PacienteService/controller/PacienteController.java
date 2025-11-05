@@ -91,6 +91,16 @@ public class PacienteController {
         return new PacienteBasicoDTO(p.getId(), p.getNombre(), p.getTelefono());
     }
 
+    @GetMapping("/public/completo/{id}")
+    @PreAuthorize("permitAll()")
+    public Paciente obtenerPublicoCompleto(@PathVariable Long id) {
+        Paciente p = pacienteService.ObtenerId(id);
+        if (p == null) {
+            throw new RuntimeException("Paciente no encontrado con ID " + id);
+        }
+        return p;
+    }
+
     @PostMapping("/ia/solicitud")
     @PreAuthorize("hasAuthority('ROLE_PACIENTE')")
     public ResponseEntity<?> solicitarIA(@RequestBody Map<String, String> body) {

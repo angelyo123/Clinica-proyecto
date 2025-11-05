@@ -1,5 +1,6 @@
 package com.CitaService.service;
 
+import com.CitaService.client.HorarioClient;
 import com.CitaService.client.MedicoClient;
 import com.CitaService.client.PacienteClient;
 import com.CitaService.model.*;
@@ -8,6 +9,7 @@ import jakarta.transaction.Transactional;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -25,40 +27,89 @@ public class CitaServiceImpl implements CitaService {
     @Autowired
     private PacienteClient pacienteClient;
 
+    @Autowired
+    private HorarioClient horarioClient;
+
     @Override
     public List<Cita> listar() {
         return citaRepository.findAll();
     }
 
     @Override
-    public Cita crear(Cita cita) {
+    public CitaDTO crear(CitaDTO citaDTO) {
         System.out.println("🩺 [DEBUG] Intentando crear cita...");
-        System.out.println("📦 Datos recibidos: " + cita);
+        System.out.println("📦 Datos recibidos: " + citaDTO);
 
-        PacienteDTO paciente = null;
-        MedicoDTO medico = null;
+        if (citaDTO.getMedico() == null || citaDTO.getMedico().getId() == null)
+            throw new IllegalArgumentException("Debe especificar un médico válido");
+        if (citaDTO.getPaciente() == null || citaDTO.getPaciente().getId() == null)
+            throw new IllegalArgumentException("Debe especificar un paciente válido");
 
-        try {
-            paciente = pacienteClient.obtener(cita.getIdPaciente());
-            medico = medicoClient.obtener(cita.getIdMedico());
-        } catch (Exception e) {
-            System.out.println("❌ [ERROR] Fallo al consumir microservicio externo:");
-            e.printStackTrace();
-        }
+        // 🔍 Validar médico y paciente en microservicios
+        PacienteDTO paciente = pacienteClient.obtener(citaDTO.getPaciente().getId());
+        MedicoDTO medico = medicoClient.obtener(citaDTO.getMedico().getId());
 
-        System.out.println("🧩 [DEBUG] Paciente obtenido: " + paciente);
-        System.out.println("🧩 [DEBUG] Médico obtenido: " + medico);
-
-        if (paciente == null || medico == null) {
-            System.out.println("🚨 [ERROR] Paciente o médico no válido. Rechazando creación.");
+        if (paciente == null || medico == null)
             throw new IllegalArgumentException("Paciente o médico no válido");
+
+        // 🔍 Validar existencia del horario
+        if (citaDTO.getIdHorario() != null) {
+            try {
+                List<Map<String, Object>> result = horarioClient.listarPorMedico(citaDTO.getMedico().getId());
+                boolean existe = result.stream()
+                        .anyMatch(h -> ((Number) h.get("id")).longValue() == citaDTO.getIdHorario());
+
+                if (!existe)
+                    throw new IllegalArgumentException("❌ El horario no pertenece al médico o no existe");
+            } catch (Exception e) {
+                throw new IllegalArgumentException("❌ Error verificando horario: " + e.getMessage());
+            }
+
+            // ✅ Verificar que el horario no esté ocupado en esa fecha
+            List<String> estadosActivos = List.of("PENDIENTE", "CONFIRMADA", "EN_PROCESO");
+            boolean ocupado = citaRepository.existsByIdHorarioAndFechaCitaAndEstadoIn(
+                    citaDTO.getIdHorario(),
+                    citaDTO.getFechaCita().toLocalDate(),
+                    estadosActivos
+            );
+            if (ocupado)
+                throw new IllegalArgumentException("⚠️ Ya existe una cita activa en ese horario y fecha.");
         }
 
+        // Crear entidad base
+        Cita cita = new Cita();
+        cita.setFechaCreacion(LocalDateTime.now());
+        cita.setFechaCita(citaDTO.getFechaCita());
+        cita.setIdMedico(citaDTO.getMedico().getId());
+        cita.setIdPaciente(citaDTO.getPaciente().getId());
+        cita.setIdHorario(citaDTO.getIdHorario());
         cita.setEstado("PENDIENTE");
+
         Cita nueva = citaRepository.save(cita);
 
-        System.out.println("✅ [OK] Cita creada correctamente con ID: " + nueva.getId());
-        return nueva;
+        // ✅ Actualizar disponibilidad del horario
+        if (nueva.getIdHorario() != null) {
+            try {
+                horarioClient.actualizarDisponibilidad(nueva.getIdHorario(), false);
+                System.out.println("🕒 Horario marcado como NO disponible.");
+            } catch (Exception e) {
+                System.out.println("⚠️ No se pudo actualizar disponibilidad del horario");
+            }
+        }
+
+        // Retornar DTO enriquecido
+        CitaDTO dto = CitaDTO.builder()
+                .id(nueva.getId())
+                .fechaCreacion(nueva.getFechaCreacion())
+                .fechaCita(nueva.getFechaCita())
+                .estado(nueva.getEstado())
+                .medico(medico)
+                .paciente(paciente)
+                .idHorario(nueva.getIdHorario())
+                .build();
+
+        System.out.println("✅ [SUCCESS] Cita creada correctamente: " + dto);
+        return dto;
     }
 
     @Override
@@ -78,31 +129,36 @@ public class CitaServiceImpl implements CitaService {
 
     @Override
     public CitaDTO actualizarEstado(Long id, String estado) {
-        // 1. Encuentra la cita
         Cita cita = citaRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Cita no encontrada"));
 
-        // 2. Actualiza el estado y guarda
         cita.setEstado(estado);
         Cita citaActualizada = citaRepository.save(cita);
 
-        // 3. Obtén los detalles del médico y paciente
-       MedicoDTO medico = medicoClient.obtener(citaActualizada.getIdMedico());
+        MedicoDTO medico = medicoClient.obtener(citaActualizada.getIdMedico());
         PacienteDTO paciente = pacienteClient.obtener(citaActualizada.getIdPaciente());
 
-        // 4. Construye y retorna el CitaDTO
-        CitaDTO dto = new CitaDTO();
-        dto.setId(citaActualizada.getId());
-        dto.setFechaHora(citaActualizada.getFechaHora());
-        dto.setEstado(citaActualizada.getEstado());
-        dto.setMedico(medico);
-        dto.setPaciente(paciente);
-
-        return dto;
+        return CitaDTO.builder()
+                .id(citaActualizada.getId())
+                .fechaCita(citaActualizada.getFechaCita())
+                .fechaCreacion(citaActualizada.getFechaCreacion())
+                .estado(citaActualizada.getEstado())
+                .medico(medico)
+                .paciente(paciente)
+                .build();
     }
 
     @Override
     public void eliminar(Long id) {
+        Cita cita = citaRepository.findById(id).orElse(null);
+        if (cita != null && cita.getIdHorario() != null) {
+            try {
+                horarioClient.actualizarDisponibilidad(cita.getIdHorario(), true);
+                System.out.println("🟢 Horario liberado tras eliminación de cita.");
+            } catch (Exception e) {
+                System.out.println("⚠️ No se pudo liberar horario tras eliminación de cita.");
+            }
+        }
         citaRepository.deleteById(id);
     }
 
@@ -111,187 +167,55 @@ public class CitaServiceImpl implements CitaService {
         Cita cita = citaRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Cita no encontrada"));
 
-        CitaDTO dto = new CitaDTO();
-        dto.setId(cita.getId());
-        dto.setFechaHora(cita.getFechaHora());
-        dto.setEstado(cita.getEstado());
-
-        dto.setMedico(medicoClient.obtener(cita.getIdMedico()));
-        dto.setPaciente(pacienteClient.obtener(cita.getIdPaciente()));
-
-        return dto;
-    }
-
-    public List<CitaMedicoDTO> listarCitasPorMedicoConPacientes(Long medicoId) {
-        List<Cita> citas = citaRepository.findByIdMedico(medicoId);
-
-        return citas.stream().map(c -> {
-            CitaMedicoDTO dto = new CitaMedicoDTO();
-            dto.setId(c.getId());
-            dto.setFechaHora(c.getFechaHora());
-            dto.setEstado(c.getEstado());
-            dto.setPaciente(pacienteClient.obtener(c.getIdPaciente()));
-            return dto;
-        }).collect(Collectors.toList());
+        return CitaDTO.builder()
+                .id(cita.getId())
+                .fechaCreacion(cita.getFechaCreacion())
+                .fechaCita(cita.getFechaCita())
+                .estado(cita.getEstado())
+                .medico(medicoClient.obtener(cita.getIdMedico()))
+                .paciente(pacienteClient.obtener(cita.getIdPaciente()))
+                .build();
     }
 
     @Override
     public List<CitaDTO> listarDetalles() {
-        List<Cita> citasDeLaBD = citaRepository.findAll();
-
-        return citasDeLaBD.stream()
-                .map(cita -> {
-                    CitaDTO dto = new CitaDTO();
-                    dto.setId(cita.getId());
-                    dto.setFechaHora(cita.getFechaHora());
-                    dto.setEstado(cita.getEstado());
-                    dto.setMedico(medicoClient.obtener(cita.getIdMedico()));
-                    dto.setPaciente(pacienteClient.obtener(cita.getIdPaciente()));
-                    return dto;
-                })
-                .collect(Collectors.toList());
-    }
-
-
-
-    @Override
-    public CitaDTO crearDetalle(CitaDTO dto) {
-
-        System.out.println("📦 DTO recibido: " + dto);
-        System.out.println("🔍 pacienteId = " + dto.getPaciente().getId());
-        System.out.println("🔍 medicoId = " + dto.getMedico().getId());
-
-        System.out.println("🩺 [DEBUG] Iniciando creación de cita con detalle...");
-        System.out.println("📦 DTO recibido: " + dto);
-
-        Cita nuevaCita = new Cita();
-        nuevaCita.setFechaHora(dto.getFechaHora());
-        nuevaCita.setEstado("PENDIENTE");
-
-        // 🔹 Convertir IDs
-        Long medicoId = null;
-        Long pacienteId = null;
-        try {
-            // DESPUÉS
-            medicoId = dto.getMedico().getId();
-            pacienteId = dto.getPaciente().getId();
-        } catch (Exception e) {
-            System.out.println("⚠️ [WARN] Error al extraer IDs de médico/paciente del DTO:");
-            e.printStackTrace();
-        }
-
-        nuevaCita.setIdMedico(medicoId);
-        nuevaCita.setIdPaciente(pacienteId);
-
-        System.out.println("🔍 Solicitando datos externos:");
-        System.out.println("   - Médico ID: " + medicoId);
-        System.out.println("   - Paciente ID: " + pacienteId);
-
-        MedicoDTO medico = null;
-        PacienteDTO paciente = null;
-
-        try {
-            medico = medicoClient.obtener(medicoId);
-            System.out.println("✅ [OK] Respuesta médico: " + medico);
-        } catch (Exception e) {
-            System.out.println("❌ [ERROR] Falló la consulta al microservicio de MÉDICOS:");
-            e.printStackTrace();
-        }
-
-
-        try {
-            paciente = pacienteClient.obtener(pacienteId);
-            System.out.println("✅ [OK] Respuesta paciente: " + paciente);
-        } catch (Exception e) {
-            System.out.println("❌ [ERROR] Falló la consulta al microservicio de PACIENTES:");
-            e.printStackTrace();
-        }
-
-        if (paciente == null || medico == null) {
-            System.out.println("🚨 [ERROR] Paciente o médico no válido. Datos nulos detectados.");
-            throw new IllegalArgumentException("Paciente o médico no válido");
-        }
-
-        // 🔹 Persistir en base de datos
-        Cita citaGuardada = citaRepository.save(nuevaCita);
-
-        System.out.println("💾 [OK] Cita guardada con ID: " + citaGuardada.getId());
-
-        // 🔹 Devolver DTO completo
-        dto.setId(citaGuardada.getId());
-        dto.setEstado(citaGuardada.getEstado());
-        dto.setMedico(medico);
-        dto.setPaciente(paciente);
-
-        System.out.println("✅ [SUCCESS] Cita creada correctamente: " + dto);
-        return dto;
-    }
-
-
-    @Override
-    public CitaDTO actualizarDetalle(Long id, CitaDTO dto) {
-        Cita citaExistente = citaRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Cita no encontrada con id: " + id));
-
-        Long medicoId = dto.getMedico() != null ? dto.getMedico().getId() : null;
-        Long pacienteId = dto.getPaciente() != null ? dto.getPaciente().getId() : null;
-
-
-        if (medicoId == null || pacienteId == null) {
-            throw new IllegalArgumentException("El médico o el paciente no tienen ID asignado.");
-        }
-
-        MedicoDTO medico = medicoClient.obtener(medicoId);
-        PacienteDTO paciente = pacienteClient.obtener(pacienteId);
-        if (paciente == null || medico == null) {
-            throw new IllegalArgumentException("Paciente o médico no válido");
-        }
-
-        citaExistente.setFechaHora(dto.getFechaHora());
-        citaExistente.setEstado(dto.getEstado());
-        citaExistente.setIdMedico(medicoId);
-        citaExistente.setIdPaciente(pacienteId);
-
-        citaRepository.save(citaExistente);
-
-        dto.setId(id);
-        dto.setMedico(medico);
-        dto.setPaciente(paciente);
-
-        return dto;
+        return citaRepository.findAll().stream()
+                .map(cita -> CitaDTO.builder()
+                        .id(cita.getId())
+                        .fechaCreacion(cita.getFechaCreacion())
+                        .fechaCita(cita.getFechaCita())
+                        .estado(cita.getEstado())
+                        .medico(medicoClient.obtener(cita.getIdMedico()))
+                        .paciente(pacienteClient.obtener(cita.getIdPaciente()))
+                        .build()
+                ).collect(Collectors.toList());
     }
 
     @Override
     public List<CitaDTO> listarDetallesPorPaciente(Long pacienteId) {
-        List<Cita> citasDelPaciente = citaRepository.findByIdPaciente(pacienteId);
-
-        return citasDelPaciente.stream()
-                .map(cita -> {
-                    CitaDTO dto = new CitaDTO();
-                    dto.setId(cita.getId());
-                    dto.setFechaHora(cita.getFechaHora());
-                    dto.setEstado(cita.getEstado());
-                    dto.setMedico(medicoClient.obtener(cita.getIdMedico()));
-                    dto.setPaciente(pacienteClient.obtener(cita.getIdPaciente()));
-                    return dto;
-                })
-                .collect(Collectors.toList());
+        return citaRepository.findByIdPaciente(pacienteId).stream()
+                .map(cita -> CitaDTO.builder()
+                        .id(cita.getId())
+                        .fechaCreacion(cita.getFechaCreacion())
+                        .fechaCita(cita.getFechaCita())
+                        .estado(cita.getEstado())
+                        .medico(medicoClient.obtener(cita.getIdMedico()))
+                        .paciente(pacienteClient.obtener(cita.getIdPaciente()))
+                        .build()
+                ).collect(Collectors.toList());
     }
 
     @Override
     public List<CitaDTO> listarDetallesPorMedico(Long medicoId) {
-        List<Cita> citasDelMedico = citaRepository.findByIdMedico(medicoId);
-
-        return citasDelMedico.stream()
-                .map(cita -> {
-                    CitaDTO dto = new CitaDTO();
-                    dto.setId(cita.getId());
-                    dto.setFechaHora(cita.getFechaHora());
-                    dto.setEstado(cita.getEstado());
-                    dto.setPaciente(pacienteClient.obtener(cita.getIdPaciente()));
-                    return dto;
-                })
-                .collect(Collectors.toList());
+        return citaRepository.findByIdMedico(medicoId).stream()
+                .map(cita -> CitaDTO.builder()
+                        .id(cita.getId())
+                        .fechaCreacion(cita.getFechaCreacion())
+                        .fechaCita(cita.getFechaCita())
+                        .estado(cita.getEstado())
+                        .paciente(pacienteClient.obtener(cita.getIdPaciente()))
+                        .build()
+                ).collect(Collectors.toList());
     }
 
     @Override
@@ -300,7 +224,15 @@ public class CitaServiceImpl implements CitaService {
         for (Cita cita : citas) {
             cita.setEstado("CANCELADA");
             citaRepository.save(cita);
+
+            if (cita.getIdHorario() != null) {
+                try {
+                    horarioClient.actualizarDisponibilidad(cita.getIdHorario(), true);
+                    System.out.println("🟢 Horario " + cita.getIdHorario() + " marcado como disponible nuevamente.");
+                } catch (Exception e) {
+                    System.out.println("⚠️ No se pudo reabrir disponibilidad del horario " + cita.getIdHorario());
+                }
+            }
         }
     }
-
 }

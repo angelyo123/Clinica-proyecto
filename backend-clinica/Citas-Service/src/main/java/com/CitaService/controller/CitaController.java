@@ -2,7 +2,6 @@ package com.CitaService.controller;
 
 import com.CitaService.model.Cita;
 import com.CitaService.model.CitaDTO;
-import com.CitaService.model.CitaMedicoDTO;
 import com.CitaService.service.CitaService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -10,100 +9,89 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/cita")
-//@PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_MEDICO','ROLE_PACIENTE')")
+@CrossOrigin(origins = "http://localhost:4200")
 public class CitaController {
 
     @Autowired
     private CitaService citaService;
 
+    // ✅ Crear cita (DTO enriquecido)
+    @PostMapping("/crear")
+    @PreAuthorize("permitAll()")
+    public ResponseEntity<?> crear(@RequestBody CitaDTO citaDTO) {
+        try {
+            CitaDTO citaCreada = citaService.crear(citaDTO);
+            return ResponseEntity.status(201).body(citaCreada);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(Map.of(
+                    "error", "Ocurrió un error inesperado al crear la cita",
+                    "detalle", e.getMessage()
+            ));
+        }
+    }
+
+    // 🔹 Listar citas simples (sin detalles)
     @GetMapping("/listar")
     public List<Cita> listar() {
         return citaService.listar();
     }
 
+    // 🔹 Obtener una cita simple
     @GetMapping("/obtener/{id}")
     public Cita obtener(@PathVariable Long id) {
         return citaService.obtener(id);
     }
 
-    @PostMapping("/crear")
-    @PreAuthorize("permitAll()")
-    public Cita crear(@RequestBody Cita cita) {
-        return citaService.crear(cita);
-    }
-
+    // 🔹 Listar citas simples por paciente
     @GetMapping("/listarPorPaciente")
     public List<Cita> listarPorPaciente(@RequestParam Long pacienteId) {
         return citaService.listarPorPaciente(pacienteId);
     }
 
+    // 🔹 Listar citas simples por médico
     @GetMapping("/listarPorMedico")
     @PreAuthorize("permitAll()")
-    public ResponseEntity<List<Cita>> listarPorMedico(@RequestParam Long medicoId) {
-        List<Cita> citas = citaService.listarPorMedico(medicoId);
-        return ResponseEntity.ok(citas);
+    public List<Cita> listarPorMedico(@RequestParam Long medicoId) {
+        return citaService.listarPorMedico(medicoId);
     }
 
-    @PutMapping("/actualizarEstado/{id}")
-    public CitaDTO actualizarEstado(@PathVariable Long id, @RequestParam String estado) {
-        return citaService.actualizarEstado(id, estado);
-    }
-
-    @DeleteMapping("/eliminar/{id}")
-    public void eliminar(@PathVariable Long id) {
-        citaService.eliminar(id);
-    }
-
+    // 🔹 Obtener cita con detalles (DTO completo)
     @GetMapping("/detalle/{id}")
     public ResponseEntity<CitaDTO> obtenerDetalle(@PathVariable Long id) {
         return ResponseEntity.ok(citaService.obtenerDetalle(id));
     }
 
-    @GetMapping("/detallePorMedico")
-    //@PreAuthorize("hasAnyAuthority('ROLE_MEDICO','ROLE_ADMIN')")
-    public ResponseEntity<List<CitaMedicoDTO>> listarDetallePorMedico(@RequestParam Long medicoId) {
-        return ResponseEntity.ok(citaService.listarCitasPorMedicoConPacientes(medicoId));
-    }
-
+    // 🔹 Listar todas las citas detalladas
     @GetMapping("/listar/detalles")
     public List<CitaDTO> listarDetalles() {
         return citaService.listarDetalles();
     }
 
-    @PostMapping("/crear/detalle")
-    public ResponseEntity<CitaDTO> crearDetalle(@RequestBody CitaDTO citaDTO) {
-        CitaDTO citaCreada = citaService.crearDetalle(citaDTO);
-        return ResponseEntity.status(201).body(citaCreada); // 201 Created
-    }
-
-    @PutMapping("/actualizar/detalle/{id}")
-    public ResponseEntity<CitaDTO> actualizarDetalle(@PathVariable Long id, @RequestBody CitaDTO citaDTO) {
-        CitaDTO citaActualizada = citaService.actualizarDetalle(id, citaDTO);
-        return ResponseEntity.ok(citaActualizada);
-    }
-
+    // 🔹 Listar citas detalladas por paciente
     @GetMapping("/listarPorPaciente/detalles")
     public List<CitaDTO> listarDetallesPorPaciente(@RequestParam Long pacienteId) {
-
         return citaService.listarDetallesPorPaciente(pacienteId);
     }
 
+    // 🔹 Listar citas detalladas por médico
     @GetMapping("/listarPorMedico/detalles")
     public List<CitaDTO> listarDetallesPorMedico(@RequestParam Long medicoId) {
-
         return citaService.listarDetallesPorMedico(medicoId);
     }
 
-    @PutMapping("/cancelar/{id}")
-    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_PACIENTE','ROLE_MEDICO')")
-    public ResponseEntity<CitaDTO> cancelarCita(@PathVariable Long id) {
-        CitaDTO citaCancelada = citaService.actualizarEstado(id, "CANCELADA");
-        return ResponseEntity.ok(citaCancelada);
+    // 🔹 Actualizar estado de una cita (confirmar, cancelar, etc.)
+    @PutMapping("/actualizarEstado/{id}")
+    public CitaDTO actualizarEstado(@PathVariable Long id, @RequestParam String estado) {
+        return citaService.actualizarEstado(id, estado);
     }
 
+    // 🔹 Cancelar todas las citas de un paciente
     @PutMapping("/cancelar/porPaciente/{pacienteId}")
     @PreAuthorize("hasAnyAuthority('ROLE_PACIENTE','ROLE_ADMIN')")
     public ResponseEntity<String> cancelarCitasPorPaciente(@PathVariable Long pacienteId) {
@@ -111,4 +99,10 @@ public class CitaController {
         return ResponseEntity.ok("Todas las citas del paciente han sido canceladas.");
     }
 
+    // 🔹 Eliminar una cita
+    @DeleteMapping("/eliminar/{id}")
+    public ResponseEntity<String> eliminar(@PathVariable Long id) {
+        citaService.eliminar(id);
+        return ResponseEntity.ok("Cita eliminada correctamente.");
+    }
 }

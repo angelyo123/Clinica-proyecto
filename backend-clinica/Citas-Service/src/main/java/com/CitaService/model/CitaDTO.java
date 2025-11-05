@@ -1,6 +1,7 @@
 package com.CitaService.model;
 
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
@@ -10,10 +11,14 @@ import java.util.Map;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
+@Builder
 public class CitaDTO {
     private Long id;
-    private LocalDateTime fechaHora;
+    private LocalDateTime fechaCreacion;
+    private LocalDateTime fechaCita;
     private String estado;
+
     private MedicoDTO medico;
     private PacienteDTO paciente;
+    private Long idHorario;
 }

@@ -15,5 +15,4 @@ public class CitaDecisionDTO {
     private String fecha;
     private String hora;
     private String mensaje;
-
 }

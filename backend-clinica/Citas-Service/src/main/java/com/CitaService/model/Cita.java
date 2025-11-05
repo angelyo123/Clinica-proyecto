@@ -17,15 +17,15 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 @Builder
 public class Cita {
-
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    private LocalDateTime fechaHora;
-    private String estado; // PENDIENTE, CONFIRMADA, CANCELADA
+    private LocalDateTime fechaCreacion; // ⏰ cuándo se registró
+    private LocalDateTime fechaCita;     // 📅 cuándo será la cita real
+    private String estado;
 
-    // Referencias a otros microservicios
     private Long idMedico;
     private Long idPaciente;
+    private Long idHorario;
 }

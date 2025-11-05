@@ -29,9 +29,7 @@ public class HorarioServiceImpl implements HorarioService {
 
     @Override
     public Horario crear(Horario horario) {
-        // ⚙️ Si el rango abarca varias horas, seccionamos
         List<Horario> subHorarios = new ArrayList<>();
-
         LocalTime inicio = horario.getHoraInicio();
         LocalTime fin = horario.getHoraFin();
         LocalTime actual = inicio;
@@ -39,6 +37,14 @@ public class HorarioServiceImpl implements HorarioService {
         while (actual.isBefore(fin)) {
             LocalTime siguiente = actual.plusHours(1);
             if (siguiente.isAfter(fin)) siguiente = fin;
+
+            // 🚫 Validación: evitar duplicados
+            if (horarioRepository.existsByMedicoIdAndDiaSemanaAndHoraInicio(
+                    horario.getMedicoId(), horario.getDiaSemana(), actual)) {
+                System.out.println("⚠️ Ya existe un horario a las " + actual + " para este médico y día.");
+                actual = siguiente;
+                continue; // salta la creación de ese bloque
+            }
 
             Horario bloque = new Horario();
             bloque.setDiaSemana(horario.getDiaSemana());
@@ -48,13 +54,21 @@ public class HorarioServiceImpl implements HorarioService {
             bloque.setDisponible(true);
             bloque.setPacientesPorHora(horario.getPacientesPorHora());
 
+            // 🗓️ Nuevo: asignar fechas si se proporcionan
+            bloque.setFechaInicio(horario.getFechaInicio());
+            bloque.setFechaFin(horario.getFechaFin());
+
             subHorarios.add(bloque);
             actual = siguiente;
         }
 
+        if (subHorarios.isEmpty()) {
+            throw new IllegalArgumentException("❌ Todos los horarios ya estaban registrados");
+        }
+
         horarioRepository.saveAll(subHorarios);
-        // Retorna el primero como referencia
-        return subHorarios.get(0);
+        System.out.println("✅ Se crearon " + subHorarios.size() + " bloques de horario para el médico " + horario.getMedicoId());
+        return subHorarios.get(0); // devuelve el primero solo para confirmar creación
     }
 
     @Override
@@ -82,4 +96,19 @@ public class HorarioServiceImpl implements HorarioService {
         System.out.println("✅ Horarios encontrados: " + result.size());
         return result;
     }
+
+    @Override
+    public void eliminarTodos() {
+        long total = horarioRepository.count(); // cuenta cuántos hay antes de borrar
+        horarioRepository.deleteAll(); // borra todos los registros
+        System.out.println("🗑️ Se eliminaron todos los horarios (" + total + " registros).");
+    }
+
+    @Override
+    public void eliminarPorMedico(Long medicoId) {
+        long total = horarioRepository.findByMedicoId(medicoId).size();
+        horarioRepository.deleteByMedicoId(medicoId);
+        System.out.println("🗑️ Se eliminaron " + total + " horarios del médico con ID " + medicoId);
+    }
+
 }

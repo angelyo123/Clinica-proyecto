@@ -2,6 +2,7 @@ package com.horariosservice.controller;
 
 import com.horariosservice.client.MedicoClient;
 import com.horariosservice.model.Horario;
+import com.horariosservice.repository.HorarioRepository;
 import com.horariosservice.service.HorarioService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -9,6 +10,8 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -23,6 +26,8 @@ public class HorarioController {
     @Autowired
     private MedicoClient medicoClient;
 
+    @Autowired
+    private HorarioRepository horarioRepository;
     // ✅ Listar todos los horarios
     @GetMapping
     //@PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_MEDICO')")
@@ -41,6 +46,18 @@ public class HorarioController {
         return ResponseEntity.ok(horario);
     }
 
+    @PutMapping("/{id}/disponibilidad/{estado}")
+    public ResponseEntity<Void> actualizarDisponibilidad(@PathVariable Long id, @PathVariable boolean estado) {
+        Horario horario = horarioService.obtener(id);
+        if (horario == null) {
+            return ResponseEntity.notFound().build();
+        }
+        horario.setDisponible(estado);
+        horarioService.actualizar(id, horario);
+        return ResponseEntity.ok().build();
+    }
+
+    // ✅ Crear horario (ADMIN o MEDICO)
     @PostMapping("/crear")
     @PreAuthorize("hasAnyRole('ADMIN', 'MEDICO')")
     public ResponseEntity<Horario> crear(@RequestBody Horario horario, Authentication auth) {
@@ -78,6 +95,14 @@ public class HorarioController {
         return ResponseEntity.ok(nuevo);
     }
 
+
+
+    // ✅ Eliminar TODOS los horarios (solo ADMIN)
+    @DeleteMapping("/eliminar/todos")
+    public ResponseEntity<String> eliminarTodos() {
+        horarioService.eliminarTodos();
+        return ResponseEntity.ok("🗑️ Todos los horarios han sido eliminados correctamente.");
+    }
 
 
     // ✅ Actualizar horario existente
@@ -148,6 +173,13 @@ public class HorarioController {
     @PreAuthorize("permitAll()")
     public ResponseEntity<List<Horario>> listarPorMedico(@PathVariable Long id) {
         return ResponseEntity.ok(horarioService.listarPorMedico(id));
+    }
+
+    @DeleteMapping("/eliminar/porMedico/{medicoId}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<String> eliminarPorMedico(@PathVariable Long medicoId) {
+        horarioService.eliminarPorMedico(medicoId);
+        return ResponseEntity.ok("🗑️ Horarios del médico " + medicoId + " eliminados correctamente.");
     }
 
     @GetMapping("/mios")

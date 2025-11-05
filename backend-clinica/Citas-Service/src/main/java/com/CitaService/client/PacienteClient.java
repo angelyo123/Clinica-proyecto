@@ -13,7 +13,7 @@ public interface PacienteClient {
     @GetMapping("/paciente/{id}")
     Map<String, Object> findById(@PathVariable("id") Long id);
 
-    @GetMapping("/paciente/public/obtener/{id}")
+    @GetMapping("/paciente/public/completo/{id}")
     PacienteDTO obtener(@PathVariable Long id);
 
 }

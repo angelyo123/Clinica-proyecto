@@ -9,6 +9,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.time.LocalDate;
 import java.time.LocalTime;
 
 @Entity
@@ -23,10 +24,13 @@ public class Horario {
     private Long id;
 
     private Long medicoId;
-    private String diaSemana; // LUNES, MARTES, etc.
+    private String diaSemana;
     private LocalTime horaInicio;
     private LocalTime horaFin;
+
+    private LocalDate fechaInicio; // ej: 2025-11-05
+    private LocalDate fechaFin;    // ej: 2025-11-11
+
     private boolean disponible = true;
     private int pacientesPorHora = 1;
-
 }

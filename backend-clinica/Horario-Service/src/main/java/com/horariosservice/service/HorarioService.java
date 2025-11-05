@@ -11,4 +11,8 @@ public interface HorarioService {
     Horario actualizar(Long id, Horario horario);
     void eliminar(Long id);
     List<Horario> listarPorMedico(Long medicoId);
+    // 🧨 Nuevo: eliminar todos los horarios
+    void eliminarTodos();
+    // 🧩 (Opcional) eliminar horarios de un médico específico
+    void eliminarPorMedico(Long medicoId);
 }
