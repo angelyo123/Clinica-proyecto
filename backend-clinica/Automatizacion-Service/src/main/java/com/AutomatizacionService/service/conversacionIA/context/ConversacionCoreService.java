@@ -10,6 +10,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 @Service
@@ -29,59 +32,102 @@ public class ConversacionCoreService {
             Long pacienteId = Long.valueOf(solicitud.get("pacienteId").toString());
             String mensaje = solicitud.get("mensaje").toString();
 
-            // 🔄 Verificar actualización de médicos (separado)
-            actualizacionMedicosService.verificarYActualizar(pacienteId);
-
-            // 🧠 Construir contexto
+            // 🧠 Contexto previo
             String contextoPrevio = contextService.construirContextoConversacion(pacienteId);
             String ultimoJson = contextService.obtenerUltimoData(pacienteId);
             String memoria = contextService.construirMemoriaPaciente(pacienteId);
 
-            // 🧩 Construir prompt principal
+            // 🧩 Paso 1: la IA decide las acciones necesarias
             String prompt = promptBuilder.construirPrompt(mensaje, contextoPrevio, ultimoJson, memoria);
-
-            // 🔮 Llamar a DeepSeek
             String respuestaIA = deepSeekService.generarTexto(prompt);
             JsonNode root = mapper.readTree(respuestaIA);
             String contenido = root.path("choices").get(0).path("message").path("content").asText();
+            System.out.println("🧠 [RAW RESPUESTA IA] " + contenido);
 
-            Map<String, Object> decision;
-            try {
-                decision = mapper.readValue(contenido, Map.class);
-            } catch (Exception e) {
-                decision = Map.of("accion", "", "parametros", Map.of(), "respuesta", contenido);
+            // 🧹 Limpieza de formato Markdown de la respuesta IA
+            contenido = contenido
+                    .replaceAll("^```json", "")
+                    .replaceAll("^```", "")
+                    .replaceAll("```$", "")
+                    .replaceAll("```", "")
+                    .trim();
+            System.out.println("🧠 [LIMPIO RESPUESTA IA] " + contenido);
+
+            Map<String, Object> decision = mapper.readValue(contenido, Map.class);
+
+            // 💾 Guardar decisión inicial
+            contextService.guardar(
+                    pacienteId,
+                    mensaje,
+                    decision.getOrDefault("respuesta", "").toString(),
+                    decision.get("data")
+            );
+
+            // ⚙️ Obtener lista de acciones
+            List<Map<String, Object>> acciones = (List<Map<String, Object>>) decision.get("acciones");
+            if (acciones == null || acciones.isEmpty()) {
+                String accionSimple = decision.getOrDefault("accion", "").toString();
+                if (accionSimple.isBlank()) {
+                    return Map.of("mensaje", decision.getOrDefault("respuesta", "No entendí tu mensaje."));
+                }
+                acciones = List.of(Map.of(
+                        "accion", accionSimple,
+                        "parametros", decision.getOrDefault("parametros", Map.of())
+                ));
             }
 
-            // 💾 Guardar conversación
-            contextService.guardar(pacienteId, mensaje,
-                    decision.getOrDefault("respuesta", "").toString(), decision.get("data"));
+            // 🚀 Ejecutar cada acción pedida por la IA
+            Map<String, Object> dataFusionada = new LinkedHashMap<>();
 
-            String accion = decision.getOrDefault("accion", "").toString();
-            if (accion.isBlank()) {
-                return Map.of("mensaje", decision.getOrDefault("respuesta", "No entendí tu mensaje."));
+            for (Map<String, Object> accionInfo : acciones) {
+                String accion = (String) accionInfo.get("accion");
+                Map<String, Object> params = (Map<String, Object>) accionInfo.getOrDefault("parametros", Map.of());
+
+                var accionIA = accionRegistry.getAcciones().get(accion);
+                if (accionIA == null) {
+                    System.out.println("⚠️ Acción no registrada: " + accion);
+                    continue;
+                }
+
+                System.out.println("🧠 Ejecutando acción dinámica: " + accionIA.nombre());
+                Map<String, Object> resultado = accionIA.metodo().apply(pacienteId, params);
+
+                // 🔧 Fusión semántica por nombre de acción
+                switch (accion) {
+                    case "listar_medicos" -> dataFusionada.put("medicos", resultado.get("data"));
+                    case "listar_horarios" -> dataFusionada.put("horarios", resultado.get("data"));
+                    default -> dataFusionada.put(accion, resultado.get("data"));
+                }
             }
 
-            // ⚙️ Ejecutar acción
-            var accionIA = accionRegistry.getAcciones().get(accion);
-            if (accionIA == null) {
-                return Map.of("mensaje", "Disculpa, no tengo una acción registrada para eso aún.");
+            String razonamientoFinal = decision.getOrDefault("respuesta", "").toString();
+            if (decision.containsKey("acciones")) {
+                razonamientoFinal = "";
             }
 
-            System.out.println("🧠 Ejecutando acción dinámica: " + accionIA.nombre());
-            Map<String, Object> resultadoAccion = accionIA.metodo().apply(pacienteId, decision);
+            // 🤔 Si hay datos estructurados, IA razona con ellos
+            if (!dataFusionada.isEmpty()) {
+                String datosJson = mapper.writeValueAsString(dataFusionada);
 
-            // 💾 Guardar nueva data
-            contextService.guardar(pacienteId, mensaje,
-                    resultadoAccion.getOrDefault("mensaje", "").toString(),
-                    resultadoAccion.get("data"));
+                String promptFinal = promptBuilder.construirPrompt(
+                        "Analiza los resultados obtenidos de las acciones ejecutadas y responde al paciente según su mensaje original.",
+                        contextoPrevio,
+                        datosJson,
+                        memoria
+                );
 
-            // 🤔 Si hay data, generar razonamiento automático
-            if (resultadoAccion.get("data") != null) {
-                return razonamientoIAService.generarRazonamientoConDatos(
-                        pacienteId, resultadoAccion.get("data"), memoria);
+                String respuestaFinal = deepSeekService.generarTexto(promptFinal);
+                JsonNode rootFinal = mapper.readTree(respuestaFinal);
+                String contenidoFinal = rootFinal.path("choices").get(0).path("message").path("content").asText();
+
+                // 💾 Guardar conversación final
+                contextService.guardar(pacienteId, mensaje, contenidoFinal, dataFusionada);
+
+                return Map.of("mensaje", contenidoFinal, "data", dataFusionada);
             }
 
-            return resultadoAccion;
+            // Si no hay datos, devolvemos la respuesta base
+            return Map.of("mensaje", razonamientoFinal);
 
         } catch (Exception e) {
             e.printStackTrace();

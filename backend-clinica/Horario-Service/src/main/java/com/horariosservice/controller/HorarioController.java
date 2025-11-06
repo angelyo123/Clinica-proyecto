@@ -3,6 +3,7 @@ package com.horariosservice.controller;
 import com.horariosservice.client.MedicoClient;
 import com.horariosservice.model.Horario;
 import com.horariosservice.repository.HorarioRepository;
+import com.horariosservice.service.HorarioChangeTracker;
 import com.horariosservice.service.HorarioService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -10,6 +11,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -28,6 +30,8 @@ public class HorarioController {
 
     @Autowired
     private HorarioRepository horarioRepository;
+
+    @Autowired private HorarioChangeTracker tracker;
     // ✅ Listar todos los horarios
     @GetMapping
     //@PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_MEDICO')")
@@ -45,6 +49,38 @@ public class HorarioController {
         }
         return ResponseEntity.ok(horario);
     }
+
+    @GetMapping("/public/cambios")
+    @PreAuthorize("permitAll()")
+    public Map<String, Object> verificarCambios(@RequestParam(required = false) String ultimaVersion) {
+        LocalDateTime actual = tracker.obtenerUltimaActualizacion();
+        boolean hayCambio = true;
+
+        if (ultimaVersion != null && !ultimaVersion.isBlank()) {
+            try {
+                LocalDateTime ultima = LocalDateTime.parse(ultimaVersion);
+                hayCambio = actual.isAfter(ultima);
+            } catch (Exception e) {
+                hayCambio = true;
+            }
+        }
+
+        System.out.println("🕓 [Horarios] Última en tracker: " + actual +
+                " | Última conocida: " + ultimaVersion +
+                " | Cambio=" + hayCambio);
+
+        return Map.of(
+                "cambio", hayCambio,
+                "ultimaVersion", actual.toString()
+        );
+    }
+
+    @GetMapping("/todos")
+    @PreAuthorize("permitAll()")
+    public ResponseEntity<List<Horario>> listarTodos() {
+        return ResponseEntity.ok(horarioService.listar());
+    }
+
 
     @PutMapping("/{id}/disponibilidad/{estado}")
     public ResponseEntity<Void> actualizarDisponibilidad(@PathVariable Long id, @PathVariable boolean estado) {
@@ -92,6 +128,7 @@ public class HorarioController {
 
         Horario nuevo = horarioService.crear(horario);
         System.out.println("✅ Horario creado correctamente: " + nuevo);
+        tracker.marcarCambio();
         return ResponseEntity.ok(nuevo);
     }
 
@@ -101,6 +138,7 @@ public class HorarioController {
     @DeleteMapping("/eliminar/todos")
     public ResponseEntity<String> eliminarTodos() {
         horarioService.eliminarTodos();
+        tracker.marcarCambio();
         return ResponseEntity.ok("🗑️ Todos los horarios han sido eliminados correctamente.");
     }
 
@@ -134,6 +172,7 @@ public class HorarioController {
         }
 
         Horario actualizado = horarioService.actualizar(id, horario);
+        tracker.marcarCambio();
         return ResponseEntity.ok(actualizado);
     }
 
@@ -166,6 +205,7 @@ public class HorarioController {
         }
 
         horarioService.eliminar(id);
+        tracker.marcarCambio();
         return ResponseEntity.noContent().build();
     }
 
@@ -179,6 +219,7 @@ public class HorarioController {
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<String> eliminarPorMedico(@PathVariable Long medicoId) {
         horarioService.eliminarPorMedico(medicoId);
+        tracker.marcarCambio();
         return ResponseEntity.ok("🗑️ Horarios del médico " + medicoId + " eliminados correctamente.");
     }
 
