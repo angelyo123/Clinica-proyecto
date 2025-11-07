@@ -1,9 +1,6 @@
 package com.CitaService.model;
 
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
+import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -23,9 +20,11 @@ public class Cita {
 
     private LocalDateTime fechaCreacion; // ⏰ cuándo se registró
     private LocalDateTime fechaCita;     // 📅 cuándo será la cita real
-    private String estado;
-
     private Long idMedico;
     private Long idPaciente;
     private Long idHorario;
+
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "estado_id")
+    private EstadoCita estado;
 }

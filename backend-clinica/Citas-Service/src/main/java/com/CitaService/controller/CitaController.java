@@ -57,8 +57,8 @@ public class CitaController {
     // 🔹 Listar citas simples por médico
     @GetMapping("/listarPorMedico")
     @PreAuthorize("permitAll()")
-    public List<Cita> listarPorMedico(@RequestParam Long medicoId) {
-        return citaService.listarPorMedico(medicoId);
+    public List<CitaDTO> listarPorMedico(@RequestParam Long medicoId) {
+        return citaService.listarDetallesPorMedico(medicoId);
     }
 
     // 🔹 Obtener cita con detalles (DTO completo)
@@ -87,8 +87,22 @@ public class CitaController {
 
     // 🔹 Actualizar estado de una cita (confirmar, cancelar, etc.)
     @PutMapping("/actualizarEstado/{id}")
-    public CitaDTO actualizarEstado(@PathVariable Long id, @RequestParam String estado) {
-        return citaService.actualizarEstado(id, estado);
+    public ResponseEntity<?> actualizarEstado(
+            @PathVariable Long id,
+            @RequestBody Map<String, String> body) {
+
+        try {
+            String nuevoEstado = body.get("nuevoEstado");
+            CitaDTO actualizada = citaService.actualizarEstado(id, nuevoEstado);
+            return ResponseEntity.ok(actualizada);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(Map.of(
+                    "error", "Error al actualizar el estado de la cita",
+                    "detalle", e.getMessage()
+            ));
+        }
     }
 
     // 🔹 Cancelar todas las citas de un paciente

@@ -1,7 +1,22 @@
 export interface Cita {
   id?: number;
-  fechaHora: string; // formato ISO o HH:mm
+  fechaCita: string | Date;
   estado: string;
-  medico: any;
-  paciente?: any;
+
+  medico?: {
+    id: number;
+    nombre?: string;
+    especialidad?: string;
+    telefono?: string;
+    dni?: string; // ✅ agregado
+  };
+
+  paciente?: {
+    id: number;
+    nombre?: string;
+    telefono?: string;
+    dni?: string; // ✅ agregado
+  };
+
+  idHorario?: number;
 }

@@ -41,4 +41,9 @@ public class RazonamientoIAService {
             return Map.of("mensaje", "Hubo un problema al procesar la información médica.");
         }
     }
+
+
+
+
+
 }

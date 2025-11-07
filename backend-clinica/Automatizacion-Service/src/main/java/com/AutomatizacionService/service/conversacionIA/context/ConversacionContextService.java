@@ -59,4 +59,21 @@ public class ConversacionContextService {
         return "Resumen del historial reciente del paciente:\n" + resumen;
     }
 
+    public String construirMemoriaMedico(Long medicoId) {
+        List<ConversacionEntity> historial = repo.findByPacienteIdOrderByFechaAsc(medicoId);
+        if (historial.isEmpty()) return "Sin historial previo.";
+
+        // Tomamos las últimas 5 interacciones para resumir
+        String resumen = historial.stream()
+                .skip(Math.max(0, historial.size() - 5))
+                .map(c -> "Médico dijo: " + c.getMensajeUsuario() +
+                        " | IA respondió: " + c.getMensajeIA())
+                .collect(Collectors.joining("\n"));
+
+        return "Resumen del historial reciente del médico:\n" + resumen;
+    }
+
+
+
+
 }

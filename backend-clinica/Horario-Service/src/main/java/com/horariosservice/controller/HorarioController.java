@@ -84,19 +84,13 @@ public class HorarioController {
 
     @PutMapping("/{id}/disponibilidad/{estado}")
     public ResponseEntity<Void> actualizarDisponibilidad(@PathVariable Long id, @PathVariable boolean estado) {
-        Horario horario = horarioService.obtener(id);
-        if (horario == null) {
-            return ResponseEntity.notFound().build();
-        }
-        horario.setDisponible(estado);
-        horarioService.actualizar(id, horario);
+        horarioService.actualizarDisponibilidad(id, estado);
         return ResponseEntity.ok().build();
     }
 
-    // ✅ Crear horario (ADMIN o MEDICO)
     @PostMapping("/crear")
     @PreAuthorize("hasAnyRole('ADMIN', 'MEDICO')")
-    public ResponseEntity<Horario> crear(@RequestBody Horario horario, Authentication auth) {
+    public ResponseEntity<Map<String, Object>> crear(@RequestBody Horario horario, Authentication auth) {
         String username = auth.getName();
         System.out.println("🔹 Usuario autenticado: " + username);
 
@@ -119,17 +113,19 @@ public class HorarioController {
                 throw new RuntimeException("❌ Error al obtener médico desde MedicoService: " + e.getMessage());
             }
         } else if (esAdmin) {
-            // Admin puede crear horario para cualquier médico
             if (horario.getMedicoId() == null) {
                 throw new RuntimeException("👑 El administrador debe indicar un médico válido (medicoId).");
             }
             System.out.println("👑 ADMIN creando horario con medicoId: " + horario.getMedicoId());
         }
 
-        Horario nuevo = horarioService.crear(horario);
-        System.out.println("✅ Horario creado correctamente: " + nuevo);
+        List<Horario> nuevos = horarioService.crear(horario);
+        System.out.println("✅ Horarios creados correctamente: " + nuevos.size());
         tracker.marcarCambio();
-        return ResponseEntity.ok(nuevo);
+
+        return ResponseEntity.ok(
+                Map.of("mensaje", "✅ " + nuevos.size() + " bloques creados correctamente.", "data", nuevos)
+        );
     }
 
 

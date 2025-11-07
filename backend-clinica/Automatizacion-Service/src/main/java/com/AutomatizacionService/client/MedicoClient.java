@@ -18,4 +18,5 @@ public interface MedicoClient {
     @GetMapping("/public/cambios")
     Map<String, Object> verificarCambios(@RequestParam(required = false) String ultimaVersion);
 
+
 }

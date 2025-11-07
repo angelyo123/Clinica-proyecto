@@ -79,8 +79,8 @@ import { FormsModule } from '@angular/forms';
 
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
                   <div class="flex flex-col">
-                    <span class="font-medium">{{ c.fechaHora | date: 'dd/MM/yyyy' }}</span>
-                    <span class="text-xs text-gray-500">{{ c.fechaHora | date: 'HH:mm' }}</span>
+                    <span class="font-medium">{{ c.fechaCita | date: 'dd/MM/yyyy' }}</span>
+                    <span class="text-xs text-gray-500">{{ c.fechaCita | date: 'HH:mm' }}</span>
                   </div>
                 </td>
 
@@ -116,7 +116,7 @@ import { FormsModule } from '@angular/forms';
                   <div class="flex flex-col">
                     <span class="font-medium">{{ c.medico?.nombre || '—' }}</span>
                     <span *ngIf="c.medico?.especialidad" class="text-xs text-gray-500">
-                      {{ c.medico.especialidad }}
+                      {{ c.medico?.especialidad }}
                     </span>
                   </div>
                 </td>
@@ -124,7 +124,7 @@ import { FormsModule } from '@angular/forms';
                 <td *ngIf="esMedico || esAdmin" class="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
                   <div class="flex flex-col">
                     <span class="font-medium">{{ c.paciente?.nombre || '—' }}</span>
-                    <span *ngIf="c.paciente?.dni" class="text-xs text-gray-500">DNI: {{ c.paciente.dni }}</span>
+                    <span *ngIf="c.paciente?.dni" class="text-xs text-gray-500">DNI: {{ c.paciente?.dni }}</span>
                   </div>
                 </td>
 

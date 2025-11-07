@@ -7,7 +7,7 @@ import java.util.List;
 public interface HorarioService {
     List<Horario> listar();
     Horario obtener(Long id);
-    Horario crear(Horario horario);
+    List<Horario> crear(Horario horario);
     Horario actualizar(Long id, Horario horario);
     void eliminar(Long id);
     List<Horario> listarPorMedico(Long medicoId);
@@ -15,4 +15,5 @@ public interface HorarioService {
     void eliminarTodos();
     // 🧩 (Opcional) eliminar horarios de un médico específico
     void eliminarPorMedico(Long medicoId);
+    public void actualizarDisponibilidad(Long id, boolean estado);
 }

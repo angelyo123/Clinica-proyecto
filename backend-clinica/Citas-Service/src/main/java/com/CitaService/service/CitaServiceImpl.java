@@ -5,6 +5,7 @@ import com.CitaService.client.MedicoClient;
 import com.CitaService.client.PacienteClient;
 import com.CitaService.model.*;
 import com.CitaService.repository.CitaRepository;
+import com.CitaService.repository.EstadoCitaRepository;
 import jakarta.transaction.Transactional;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -20,6 +21,9 @@ public class CitaServiceImpl implements CitaService {
 
     @Autowired
     private CitaRepository citaRepository;
+
+    @Autowired
+    private EstadoCitaRepository estadoCitaRepository;
 
     @Autowired
     private MedicoClient medicoClient;
@@ -52,28 +56,50 @@ public class CitaServiceImpl implements CitaService {
         if (paciente == null || medico == null)
             throw new IllegalArgumentException("Paciente o médico no válido");
 
-        // 🔍 Validar existencia del horario
+        // 🔍 Validar existencia del horario y obtener hora real
+        Map<String, Object> horarioSeleccionado = null;
         if (citaDTO.getIdHorario() != null) {
             try {
                 List<Map<String, Object>> result = horarioClient.listarPorMedico(citaDTO.getMedico().getId());
-                boolean existe = result.stream()
-                        .anyMatch(h -> ((Number) h.get("id")).longValue() == citaDTO.getIdHorario());
-
-                if (!existe)
-                    throw new IllegalArgumentException("❌ El horario no pertenece al médico o no existe");
+                horarioSeleccionado = result.stream()
+                        .filter(h -> ((Number) h.get("id")).longValue() == citaDTO.getIdHorario())
+                        .findFirst()
+                        .orElseThrow(() -> new IllegalArgumentException("❌ El horario no pertenece al médico o no existe"));
             } catch (Exception e) {
                 throw new IllegalArgumentException("❌ Error verificando horario: " + e.getMessage());
             }
 
             // ✅ Verificar que el horario no esté ocupado en esa fecha
             List<String> estadosActivos = List.of("PENDIENTE", "CONFIRMADA", "EN_PROCESO");
-            boolean ocupado = citaRepository.existsByIdHorarioAndFechaCitaAndEstadoIn(
+            boolean ocupado = citaRepository.existsByIdHorarioAndFechaCitaAndEstado_CodigoIn(
                     citaDTO.getIdHorario(),
-                    citaDTO.getFechaCita().toLocalDate(),
+                    citaDTO.getFechaCita(),
                     estadosActivos
             );
             if (ocupado)
                 throw new IllegalArgumentException("⚠️ Ya existe una cita activa en ese horario y fecha.");
+
+            // 🕓 Ajustar fechaCita para que coincida con la horaInicio del horario
+            if (horarioSeleccionado != null && horarioSeleccionado.get("horaInicio") != null) {
+                String horaInicioStr = horarioSeleccionado.get("horaInicio").toString();
+                LocalDateTime fechaOriginal = citaDTO.getFechaCita(); // puede venir de la IA
+                LocalDateTime fechaCorregida = LocalDateTime.of(
+                        fechaOriginal.toLocalDate(),
+                        java.time.LocalTime.parse(horaInicioStr)
+                );
+                citaDTO.setFechaCita(fechaCorregida);
+                System.out.println("🕒 [AJUSTE] Fecha de cita corregida según horario: " + fechaCorregida);
+            }
+        }
+
+        // 🧱 Obtener el estado (por código o usar "PENDIENTE" por defecto)
+        EstadoCita estado;
+        if (citaDTO.getEstado() != null && !citaDTO.getEstado().isBlank()) {
+            estado = estadoCitaRepository.findByCodigo(citaDTO.getEstado().toUpperCase())
+                    .orElseThrow(() -> new IllegalArgumentException("Estado no válido: " + citaDTO.getEstado()));
+        } else {
+            estado = estadoCitaRepository.findByCodigo("PENDIENTE")
+                    .orElseThrow(() -> new IllegalStateException("No existe el estado PENDIENTE"));
         }
 
         // Crear entidad base
@@ -83,26 +109,52 @@ public class CitaServiceImpl implements CitaService {
         cita.setIdMedico(citaDTO.getMedico().getId());
         cita.setIdPaciente(citaDTO.getPaciente().getId());
         cita.setIdHorario(citaDTO.getIdHorario());
-        cita.setEstado("PENDIENTE");
+        cita.setEstado(estado);
 
         Cita nueva = citaRepository.save(cita);
 
         // ✅ Actualizar disponibilidad del horario
+        // ✅ Actualizar disponibilidad del horario solo si el cupo está lleno
+        // ✅ Verificar si el horario debe quedar ocupado según cupo
         if (nueva.getIdHorario() != null) {
             try {
-                horarioClient.actualizarDisponibilidad(nueva.getIdHorario(), false);
-                System.out.println("🕒 Horario marcado como NO disponible.");
+                List<Map<String, Object>> horarios = horarioClient.listarPorMedico(nueva.getIdMedico());
+                Map<String, Object> horario = horarios.stream()
+                        .filter(h -> ((Number) h.get("id")).longValue() == nueva.getIdHorario())
+                        .findFirst()
+                        .orElse(null);
+
+                if (horario != null) {
+                    int pacientesPorHora = ((Number) horario.get("pacientesPorHora")).intValue();
+
+                    List<String> estadosActivos = List.of("PENDIENTE", "CONFIRMADA", "EN_PROCESO", "COMPLETADA");
+                    long citasActivas = citaRepository.findAll().stream()
+                            .filter(c -> c.getIdHorario() != null
+                                    && c.getIdHorario().equals(nueva.getIdHorario())
+                                    && c.getEstado() != null
+                                    && estadosActivos.contains(c.getEstado().getCodigo()))
+                            .count();
+
+                    if (citasActivas >= pacientesPorHora) {
+                        System.out.println("🌐 Llamando a HorarioClient para actualizar disponibilidad...");
+                        horarioClient.actualizarDisponibilidad(nueva.getIdHorario(), false);
+                        System.out.println("🕒 Cupo completo → Horario " + nueva.getIdHorario() + " marcado como NO disponible (" + citasActivas + "/" + pacientesPorHora + ")");
+                    } else {
+                        System.out.println("🟢 Cupo disponible (" + citasActivas + "/" + pacientesPorHora + ")");
+                    }
+                }
             } catch (Exception e) {
-                System.out.println("⚠️ No se pudo actualizar disponibilidad del horario");
+                System.out.println("⚠️ No se pudo actualizar disponibilidad del horario: " + e.getMessage());
             }
         }
+
 
         // Retornar DTO enriquecido
         CitaDTO dto = CitaDTO.builder()
                 .id(nueva.getId())
                 .fechaCreacion(nueva.getFechaCreacion())
                 .fechaCita(nueva.getFechaCita())
-                .estado(nueva.getEstado())
+                .estado(nueva.getEstado() != null ? nueva.getEstado().getCodigo() : "DESCONOCIDO")
                 .medico(medico)
                 .paciente(paciente)
                 .idHorario(nueva.getIdHorario())
@@ -128,13 +180,65 @@ public class CitaServiceImpl implements CitaService {
     }
 
     @Override
-    public CitaDTO actualizarEstado(Long id, String estado) {
+    public CitaDTO actualizarEstado(Long id, String nuevoEstado) {
+        System.out.println("🔄 [INFO] Solicitando cambio de estado para cita ID: " + id + " → " + nuevoEstado);
+
         Cita cita = citaRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Cita no encontrada"));
 
-        cita.setEstado(estado);
-        Cita citaActualizada = citaRepository.save(cita);
+        EstadoCita estado = estadoCitaRepository.findByCodigo(nuevoEstado.toUpperCase())
+                .orElseThrow(() -> new IllegalArgumentException("Estado no válido: " + nuevoEstado));
 
+        cita.setEstado(estado);
+        Cita citaActualizada = citaRepository.saveAndFlush(cita); // 👈 flush inmediato para reflejar cambios
+        System.out.println("✅ [SUCCESS] Estado actualizado a: " + estado.getCodigo());
+
+        if (citaActualizada.getIdHorario() != null) {
+            try {
+                List<Map<String, Object>> horarios = horarioClient.listarPorMedico(citaActualizada.getIdMedico());
+                Map<String, Object> horario = horarios.stream()
+                        .filter(h -> ((Number) h.get("id")).longValue() == citaActualizada.getIdHorario())
+                        .findFirst()
+                        .orElse(null);
+
+                if (horario != null) {
+                    int pacientesPorHora = ((Number) horario.get("pacientesPorHora")).intValue();
+                    List<String> estadosActivos = List.of("PENDIENTE", "CONFIRMADA", "EN_PROCESO", "COMPLETADA");
+
+                    long cantidadCitasActivas = citaRepository.findAll().stream()
+                            .filter(c -> c.getIdHorario() != null
+                                    && c.getIdHorario().equals(citaActualizada.getIdHorario())
+                                    && c.getEstado() != null
+                                    && estadosActivos.contains(c.getEstado().getCodigo()))
+                            .count();
+
+                    System.out.println("📊 Citas activas para horario " + citaActualizada.getIdHorario() + ": "
+                            + cantidadCitasActivas + "/" + pacientesPorHora);
+
+                    // 🟢 Caso 1: CANCELADA → liberar
+                    if ("CANCELADA".equalsIgnoreCase(estado.getCodigo())) {
+                        horarioClient.actualizarDisponibilidad(citaActualizada.getIdHorario(), true);
+                        System.out.println("🟢 Horario liberado tras cancelación.");
+                    }
+
+                    // 🔴 Caso 2: CONFIRMADA o EN_PROCESO → ocupar
+                    else if (List.of("PENDIENTE","CONFIRMADA", "EN_PROCESO").contains(estado.getCodigo().toUpperCase())) {
+                        if (cantidadCitasActivas >= pacientesPorHora) {
+                            horarioClient.actualizarDisponibilidad(citaActualizada.getIdHorario(), false);
+                            System.out.println("🔴 Horario marcado como NO disponible tras confirmación o proceso.");
+                        } else {
+                            // Si aún hay espacio, igual asegúrate de mantener el estado coherente
+                            System.out.println("🟢 Horario sigue disponible (cupos: "
+                                    + cantidadCitasActivas + "/" + pacientesPorHora + ")");
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                System.out.println("⚠️ Error al actualizar disponibilidad tras cambio de estado: " + e.getMessage());
+            }
+        }
+
+        // 🔍 Enriquecer con datos de médico y paciente
         MedicoDTO medico = medicoClient.obtener(citaActualizada.getIdMedico());
         PacienteDTO paciente = pacienteClient.obtener(citaActualizada.getIdPaciente());
 
@@ -142,17 +246,21 @@ public class CitaServiceImpl implements CitaService {
                 .id(citaActualizada.getId())
                 .fechaCita(citaActualizada.getFechaCita())
                 .fechaCreacion(citaActualizada.getFechaCreacion())
-                .estado(citaActualizada.getEstado())
+                .estado(estado.getCodigo())
                 .medico(medico)
                 .paciente(paciente)
+                .idHorario(citaActualizada.getIdHorario())
                 .build();
     }
+
 
     @Override
     public void eliminar(Long id) {
         Cita cita = citaRepository.findById(id).orElse(null);
         if (cita != null && cita.getIdHorario() != null) {
             try {
+                System.out.println("🌐 Llamando a HorarioClient para actualizar disponibilidad...");
+
                 horarioClient.actualizarDisponibilidad(cita.getIdHorario(), true);
                 System.out.println("🟢 Horario liberado tras eliminación de cita.");
             } catch (Exception e) {
@@ -171,7 +279,7 @@ public class CitaServiceImpl implements CitaService {
                 .id(cita.getId())
                 .fechaCreacion(cita.getFechaCreacion())
                 .fechaCita(cita.getFechaCita())
-                .estado(cita.getEstado())
+                .estado(cita.getEstado() != null ? cita.getEstado().getCodigo() : "DESCONOCIDO")
                 .medico(medicoClient.obtener(cita.getIdMedico()))
                 .paciente(pacienteClient.obtener(cita.getIdPaciente()))
                 .build();
@@ -184,7 +292,7 @@ public class CitaServiceImpl implements CitaService {
                         .id(cita.getId())
                         .fechaCreacion(cita.getFechaCreacion())
                         .fechaCita(cita.getFechaCita())
-                        .estado(cita.getEstado())
+                        .estado(cita.getEstado() != null ? cita.getEstado().getCodigo() : "DESCONOCIDO")
                         .medico(medicoClient.obtener(cita.getIdMedico()))
                         .paciente(pacienteClient.obtener(cita.getIdPaciente()))
                         .build()
@@ -198,7 +306,7 @@ public class CitaServiceImpl implements CitaService {
                         .id(cita.getId())
                         .fechaCreacion(cita.getFechaCreacion())
                         .fechaCita(cita.getFechaCita())
-                        .estado(cita.getEstado())
+                        .estado(cita.getEstado() != null ? cita.getEstado().getCodigo() : "DESCONOCIDO")
                         .medico(medicoClient.obtener(cita.getIdMedico()))
                         .paciente(pacienteClient.obtener(cita.getIdPaciente()))
                         .build()
@@ -212,7 +320,7 @@ public class CitaServiceImpl implements CitaService {
                         .id(cita.getId())
                         .fechaCreacion(cita.getFechaCreacion())
                         .fechaCita(cita.getFechaCita())
-                        .estado(cita.getEstado())
+                        .estado(cita.getEstado() != null ? cita.getEstado().getCodigo() : "DESCONOCIDO")
                         .paciente(pacienteClient.obtener(cita.getIdPaciente()))
                         .build()
                 ).collect(Collectors.toList());
@@ -221,12 +329,17 @@ public class CitaServiceImpl implements CitaService {
     @Override
     public void cancelarCitasPorPaciente(Long pacienteId) {
         List<Cita> citas = citaRepository.findByIdPaciente(pacienteId);
+        EstadoCita cancelada = estadoCitaRepository.findByCodigo("CANCELADA")
+                .orElseThrow(() -> new IllegalStateException("No existe el estado CANCELADA"));
+
         for (Cita cita : citas) {
-            cita.setEstado("CANCELADA");
+            cita.setEstado(cancelada);
             citaRepository.save(cita);
 
             if (cita.getIdHorario() != null) {
                 try {
+                    System.out.println("🌐 Llamando a HorarioClient para actualizar disponibilidad...");
+
                     horarioClient.actualizarDisponibilidad(cita.getIdHorario(), true);
                     System.out.println("🟢 Horario " + cita.getIdHorario() + " marcado como disponible nuevamente.");
                 } catch (Exception e) {

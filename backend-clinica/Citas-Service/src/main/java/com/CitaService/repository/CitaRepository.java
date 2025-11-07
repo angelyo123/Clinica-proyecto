@@ -5,6 +5,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Repository
@@ -18,5 +19,10 @@ public interface CitaRepository extends JpaRepository<Cita, Long> {
     boolean existsByIdHorarioAndEstadoIn(Long idHorario, List<String> estados);
 
     // ✅ Nueva validación: horario + fecha específica + estado
-    boolean existsByIdHorarioAndFechaCitaAndEstadoIn(Long idHorario, LocalDate fechaCita, List<String> estados);
+    boolean existsByIdHorarioAndFechaCitaAndEstado_CodigoIn(
+            Long idHorario,
+            LocalDateTime fechaCita,
+            List<String> codigosEstado
+    );
+
 }

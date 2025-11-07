@@ -5,12 +5,14 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
+import java.util.Map;
 
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 public class CitaRequest {
-    private Long idPaciente;
-    private Long idMedico;
-    private LocalDateTime fechaHora; // formato ISO-8601, ej. "2025-10-29T10:00"
+    private LocalDateTime fechaCita;  // fecha de la cita real
+    private Map<String, Object> medico;
+    private Map<String, Object> paciente;
+    private Long idHorario;
 }

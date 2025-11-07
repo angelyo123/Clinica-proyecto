@@ -146,7 +146,7 @@ export class CitaFormComponent implements OnInit {
       this.id = +idParam;
       this.citaService.obtener(this.id).subscribe(c => {
         this.form.patchValue({
-          fechaHora: c.fechaHora,
+          fechaCita: c.fechaCita,
           estado: (c.estado || 'PENDIENTE').toUpperCase(),
           medicoId: c.medico?.id,
           pacienteId: c.paciente?.id
@@ -209,7 +209,7 @@ guardar(): void {
 
   // Flujos admin (o creación)
   const cita: Cita = {
-    fechaHora: this.form.value.fechaHora,
+    fechaCita: this.form.value.fechaCita,
     estado: this.form.value.estado,
     medico: this.form.value.medicoId ? { id: this.form.value.medicoId } : undefined,
     paciente: this.form.value.pacienteId ? { id: this.form.value.pacienteId } : undefined

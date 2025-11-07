@@ -4,6 +4,7 @@ import com.AutomatizacionService.model.dto.CitaRequest;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.Map;
 
 @FeignClient(
@@ -20,5 +21,9 @@ public interface CitaClient {
 
     @PutMapping("/cancelar/porPaciente/{pacienteId}")
     Map<String, Object> cancelarPorPaciente(@PathVariable("pacienteId") Long pacienteId);
+
+    // 🔹 Listar citas por ID del médico
+    @GetMapping("/listarPorMedico")
+    List<Map<String, Object>> listarPorMedico(@RequestParam("medicoId") Long medicoId);
 
 }
