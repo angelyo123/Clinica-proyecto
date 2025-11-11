@@ -41,13 +41,18 @@ Cada horario se asocia a un médico por `horario.medicoId == medico.id`.
 %s
 
 ---
+
+                ⚠️ IMPORTANTE:
+Solo puedes ejecutar las acciones listadas arriba.
+No inventes nombres de acciones. Si necesitas algo similar, usa la más cercana disponible.
+                
 ### 🧩 Instrucciones de razonamiento
 1. Usa exclusivamente la información de `Datos estructurados actuales` como fuente principal.
 2. Identifica los médicos que **tienen horarios disponibles (`disponible=true`)** y relaciónalos por su `medicoId`.
 3. Si un médico tiene varios horarios, agrúpalos por día y rango horario (ejemplo: “lunes de 8:00 a 12:00”).
 4. No inventes datos: si algo no está en el JSON, simplemente dilo (“no hay información disponible”).
 5. Si un paciente solicita agendar, confirma el médico y horario antes de crear la cita.
-6. Si detectas que puede ejecutarse una acción del sistema (por ejemplo `listar_horarios`, `crear_cita`), **devuelve también un bloque JSON con las acciones recomendadas**.
+6. Si detectas que puede ejecutarse una acción del sistema (por ejemplo `listar_medicos_y_horarios`, `crear_cita`), **devuelve también un bloque JSON con las acciones recomendadas**.
    Ejemplo:
    ```json
    {

@@ -1,8 +1,11 @@
 export interface Horario {
-  id?: number;
+  id: number;
   medicoId: number;
-  diaSemana: string; // LUNES, MARTES, etc.
-  horaInicio: string; // formato "HH:mm"
-  horaFin: string;    // formato "HH:mm"
+  diaSemana: string;
+  horaInicio: string;
+  horaFin: string;
+  fechaInicio: string; // LocalDate del backend
+  fechaFin: string;
   disponible: boolean;
+  pacientesPorHora: number;
 }

@@ -119,4 +119,20 @@ public class CitaController {
         citaService.eliminar(id);
         return ResponseEntity.ok("Cita eliminada correctamente.");
     }
+
+    @PutMapping("/actualizar/detalle/{id}")
+    //@PreAuthorize("hasAnyAuthority('ROLE_PACIENTE', 'ROLE_ADMIN', 'ROLE_MEDICO')")
+    public ResponseEntity<?> actualizarDetalle(@PathVariable Long id, @RequestBody CitaDTO citaDTO) {
+        try {
+            CitaDTO actualizada = citaService.actualizarDetalle(id, citaDTO);
+            return ResponseEntity.ok(actualizada);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(Map.of(
+                    "error", "Error al actualizar la cita",
+                    "detalle", e.getMessage()
+            ));
+        }
+    }
 }

@@ -1,3 +1,82 @@
 @import "tailwindcss";
-/* You can add global styles to this file, and also import other style files */
-@import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Nunito:wght@400;600;700&display=swap');
+
+/* 🎨 Paleta global lavanda */
+:root {
+  --color-fondo: #F5F6FA;           /* gris perla */
+  --color-card: #FFFFFF;            /* blanco cálido */
+  --color-borde: #E4E0EC;           /* gris lavanda */
+  --color-texto: #1E1B4B;           /* gris violeta oscuro */
+  --color-secundario: #4B5563;      /* gris medio */
+  --color-primario: #8B5CF6;        /* lavanda principal */
+  --color-primario-hover: #7C3AED;  /* lavanda oscuro */
+  --color-ia-gradiente-inicio: #A78BFA;
+  --color-ia-gradiente-fin: #7C3AED;
+  --color-exito: #10B981;
+  --color-error: #EF4444;
+  --color-advertencia: #EAB308;
+}
+
+/* 🌫 Fondo y tipografía general */
+body {
+  font-family: 'Inter', 'Nunito', sans-serif;
+  background-color: var(--color-fondo);
+  color: var(--color-texto);
+  transition: all 0.2s ease-in-out;
+  scroll-behavior: smooth;
+}
+
+/* 💎 Tarjetas o secciones */
+.card, .container, .panel {
+  background-color: var(--color-card);
+  border: 1px solid var(--color-borde);
+  border-radius: 16px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.04);
+  transition: all 0.25s ease;
+}
+
+/* 🔘 Botones principales */
+button, .btn {
+  background-color: var(--color-primario);
+  color: #fff;
+  font-weight: 600;
+  border-radius: 10px;
+  padding: 0.6rem 1.2rem;
+  transition: all 0.25s ease;
+  box-shadow: 0 3px 6px rgba(139,92,246,0.3);
+}
+button:hover, .btn:hover {
+  background-color: var(--color-primario-hover);
+  transform: translateY(-2px);
+  box-shadow: 0 5px 10px rgba(124,58,237,0.4);
+}
+
+/* 💬 Estados comunes */
+.text-success { color: var(--color-exito); }
+.text-error   { color: var(--color-error); }
+.text-warning { color: var(--color-advertencia); }
+
+/* 🧠 Botón de IA o acción especial */
+.chat-ia {
+  background: linear-gradient(135deg, var(--color-ia-gradiente-inicio), var(--color-ia-gradiente-fin));
+  color: #fff;
+  font-weight: 600;
+  padding: 1rem;
+  border-radius: 14px;
+  box-shadow: 0 4px 10px rgba(139,92,246,0.3);
+  transition: all 0.25s ease;
+  text-align: center;
+}
+.chat-ia:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 14px rgba(124,58,237,0.4);
+}
+
+/* 🌈 Hover suave global */
+.hover-lift {
+  transition: all 0.2s ease-in-out;
+}
+.hover-lift:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}

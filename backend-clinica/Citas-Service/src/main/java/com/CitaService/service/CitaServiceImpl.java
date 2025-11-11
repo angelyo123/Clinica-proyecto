@@ -8,7 +8,12 @@ import com.CitaService.repository.CitaRepository;
 import com.CitaService.repository.EstadoCitaRepository;
 import jakarta.transaction.Transactional;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -282,6 +287,49 @@ public class CitaServiceImpl implements CitaService {
                 .estado(cita.getEstado() != null ? cita.getEstado().getCodigo() : "DESCONOCIDO")
                 .medico(medicoClient.obtener(cita.getIdMedico()))
                 .paciente(pacienteClient.obtener(cita.getIdPaciente()))
+                .idHorario(cita.getIdHorario())
+                .build();
+    }
+
+
+
+    @Override
+    public CitaDTO actualizarDetalle(Long id, CitaDTO citaDTO) {
+        Cita cita = citaRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Cita no encontrada"));
+
+        // ✅ liberar horario anterior si cambia
+        if (citaDTO.getIdHorario() != null && !citaDTO.getIdHorario().equals(cita.getIdHorario())) {
+            try {
+                horarioClient.actualizarDisponibilidad(cita.getIdHorario(), true);
+                System.out.println("🟢 Horario anterior liberado: " + cita.getIdHorario());
+            } catch (Exception e) {
+                System.out.println("⚠️ No se pudo liberar horario anterior: " + e.getMessage());
+            }
+        }
+
+        // 🕓 actualizar nuevos campos
+        cita.setFechaCita(citaDTO.getFechaCita());
+        cita.setIdHorario(citaDTO.getIdHorario());
+        citaRepository.save(cita);
+
+        // ✅ bloquear nuevo horario
+        try {
+            horarioClient.actualizarDisponibilidad(citaDTO.getIdHorario(), false);
+            System.out.println("🔴 Nuevo horario bloqueado: " + citaDTO.getIdHorario());
+        } catch (Exception e) {
+            System.out.println("⚠️ No se pudo bloquear nuevo horario: " + e.getMessage());
+        }
+
+        // 🔁 retornar DTO actualizado
+        return CitaDTO.builder()
+                .id(cita.getId())
+                .fechaCita(cita.getFechaCita())
+                .fechaCreacion(cita.getFechaCreacion())
+                .estado(cita.getEstado().getCodigo())
+                .medico(medicoClient.obtener(cita.getIdMedico()))
+                .paciente(pacienteClient.obtener(cita.getIdPaciente()))
+                .idHorario(cita.getIdHorario())
                 .build();
     }
 

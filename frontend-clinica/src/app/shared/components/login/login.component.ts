@@ -34,14 +34,14 @@ export class LoginComponent  {
         const roles = this.authService.getUserRoles();
 
         if (roles.includes('ROLE_ADMIN')) {
-        this.router.navigate(['/dashboard']);
-      } else if (roles.includes('ROLE_MEDICO')) {
-        this.router.navigate(['/mis-citas']); // 👈 NUEVO: redirige al panel de citas del médico
-      } else if (roles.includes('ROLE_PACIENTE')) {
-        this.router.navigate(['/mis-citas-paciente']); // sigue igual
-      } else {
-        this.router.navigate(['/login']);
-}
+          this.router.navigate(['/dashboard']);
+        } else if (roles.includes('ROLE_MEDICO')) {
+          this.router.navigate(['/medico/mis-citas']);
+        } else if (roles.includes('ROLE_PACIENTE')) {
+          this.router.navigate(['/paciente/mis-citas']);
+        } else {
+          this.router.navigate(['/login']);
+        }
 
       },
       error: () => alert('Credenciales incorrectas')

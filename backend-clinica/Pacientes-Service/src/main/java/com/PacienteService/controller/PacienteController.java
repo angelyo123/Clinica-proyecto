@@ -101,4 +101,14 @@ public class PacienteController {
         return p;
     }
 
+    @GetMapping("/public/obtenerPorUsername/{username}")
+    @PreAuthorize("permitAll()")
+    public ResponseEntity<?> obtenerPorUsername(@PathVariable String username) {
+        var paciente = pacienteService.obtenerPorUsuario(username);
+        if (paciente == null) {
+            return ResponseEntity.notFound().build();
+        }
+        return ResponseEntity.ok(paciente);
+    }
+
 }

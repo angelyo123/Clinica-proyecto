@@ -47,30 +47,30 @@ public class ConversacionCoreService {
 
             System.out.println("💬 [Conversación] Paciente ID: " + pacienteId + " → " + mensaje);
 
-            // 🧠 Contexto y memoria previos
+            // 🧠 Contexto y memoria previos (base del aprendizaje)
             String contextoPrevio = contextService.construirContextoConversacion(pacienteId);
             String memoria = contextService.construirMemoriaPaciente(pacienteId);
 
-            // 🚀 Ejecutar la acción combinada directamente para obtener médicos y horarios actualizados
+            // 🚀 Acción base para obtener entorno de datos actual
             var accion = accionRegistry.getAcciones().get("listar_medicos_y_horarios");
             Map<String, Object> resultado = accion.metodo().apply(pacienteId, Map.of());
             Map<String, Object> dataFusionada = (Map<String, Object>) resultado.get("data");
 
-            // 🧩 Crear el prompt con los datos actuales ya fusionados
+            // 🧩 Crear prompt actualizado con contexto + memoria
             String datosJson = mapper.writeValueAsString(dataFusionada);
             String prompt = promptBuilder.construirPrompt(mensaje, contextoPrevio, datosJson, memoria);
 
-            // 🔮 Llamar a la IA una sola vez (ya tiene toda la información)
+            // 🔮 Llamar al modelo IA (DeepSeek)
             String respuestaIA = deepSeekService.generarTexto(prompt);
-
             JsonNode root = mapper.readTree(respuestaIA);
             String contenido = root.path("choices").get(0).path("message").path("content").asText();
+
             System.out.println("🤖 [IA] Respuesta generada:\n" + contenido);
 
-            // 💾 Guardar conversación inicial (antes de ejecutar acciones)
+            // 💾 Guardar interacción inicial
             contextService.guardar(pacienteId, mensaje, contenido, dataFusionada);
 
-            // 🧩 Intentar detectar y ejecutar acciones sugeridas por la IA
+            // 🧩 Intentar ejecutar acciones sugeridas por la IA
             try {
                 int start = contenido.indexOf("{");
                 int end = contenido.lastIndexOf("}");
@@ -83,11 +83,11 @@ public class ConversacionCoreService {
                             String nombreAccion = accionNode.path("accion").asText();
                             JsonNode paramsNode = accionNode.path("parametros");
 
+                            // 🧠 Aprendizaje: validar si la acción existe
                             if (accionRegistry.getAcciones().containsKey(nombreAccion)) {
                                 System.out.println("⚙️ Ejecutando acción automática sugerida por la IA: " + nombreAccion);
                                 Map<String, Object> params = mapper.convertValue(paramsNode, Map.class);
 
-                                // 🔧 Ejecutar acción registrada
                                 Map<String, Object> resultadoAccion = accionRegistry.getAcciones()
                                         .get(nombreAccion)
                                         .metodo()
@@ -95,20 +95,37 @@ public class ConversacionCoreService {
 
                                 System.out.println("📦 Resultado acción " + nombreAccion + ": " + resultadoAccion);
 
-                                // Si la acción devuelve mensaje, incluirlo en la respuesta
                                 if (resultadoAccion != null && resultadoAccion.containsKey("mensaje")) {
                                     contenido += "\n\n" + resultadoAccion.get("mensaje");
                                 }
 
-                                // Guardar la conversación actualizada después de ejecutar la acción
+                                // 💾 Guardar ejecución de acción correcta
                                 contextService.guardar(
                                         pacienteId,
                                         "[IA ejecutó acción: " + nombreAccion + "]",
                                         String.valueOf(resultadoAccion),
                                         dataFusionada
                                 );
+
                             } else {
+                                // ⚠️ Acción desconocida → generar feedback de aprendizaje
                                 System.out.println("⚠️ Acción desconocida sugerida por IA: " + nombreAccion);
+
+                                String feedback = """
+                                La IA sugirió una acción no registrada: "%s".
+                                Se registrará este intento para que aprenda en futuras conversaciones.
+                                """.formatted(nombreAccion);
+
+                                contextService.guardar(
+                                        pacienteId,
+                                        "[IA propuso acción desconocida]",
+                                        feedback,
+                                        dataFusionada
+                                );
+
+                                // 🔁 Añadimos nota reflexiva para su contexto futuro
+                                contenido += "\n\n🤔 Parece que intenté usar una acción no disponible (" + nombreAccion +
+                                        "). Aprenderé a usar las disponibles correctamente la próxima vez.";
                             }
                         }
                     }

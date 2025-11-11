@@ -1,9 +1,11 @@
 package com.authservice.security;
 
+import com.authservice.client.PacienteClient;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.security.Keys;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -22,6 +24,9 @@ public class JwtUtil {
     private final String SECRET_KEY = "SecretKeyForJwtGenerationSuperSeguraDeAlMenos32Chars";
     private final long EXPIRATION_TIME = 1000 * 60 * 60; // 1 hora
 
+    @Autowired
+    private PacienteClient pacienteClient;
+
     private Key getSigningKey() {
         return Keys.hmacShaKeyFor(SECRET_KEY.getBytes());
     }
@@ -36,6 +41,20 @@ public class JwtUtil {
                 .map(GrantedAuthority::getAuthority)
                 .collect(Collectors.toList()));
         claims.put("id", userId); // 👈 incluimos el ID del usuario
+
+        // 🔹 Si el usuario es paciente, obtén su ID real desde el microservicio
+        if (userPrincipal.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_PACIENTE"))) {
+
+            try {
+                var paciente = pacienteClient.obtenerPorUsername(userPrincipal.getUsername());
+                if (paciente != null && paciente.getId() != null) {
+                    claims.put("pacienteId", paciente.getId());
+                }
+            } catch (Exception e) {
+                System.err.println("⚠️ No se pudo obtener el paciente desde el microservicio: " + e.getMessage());
+            }
+        }
 
         return Jwts.builder()
                 .setClaims(claims)

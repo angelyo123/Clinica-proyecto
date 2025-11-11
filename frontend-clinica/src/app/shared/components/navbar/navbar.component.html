@@ -1,12 +1,12 @@
 
-<nav>
-  <a *ngIf="isAdmin" routerLink="/usuarios/list">Usuarios</a>
-  <a *ngIf="isAdmin" routerLink="/medicos/list">Médicos</a>
-  <a *ngIf="isAdmin" routerLink="/pacientes/list">Pacientes</a>
-  <a *ngIf="isMedico" routerLink="/citas/list">Citas</a>
-
-  <a *ngIf="isPaciente" routerLink="/mis-citas">🗓️ Mis Citas</a>
-<a *ngIf="isPaciente" routerLink="/medicos-disponibles">👨‍⚕️ Médicos</a>
-
-  <a (click)="logout()">Cerrar sesión</a>
+<nav class="bg-blue-600 text-white p-3 flex justify-around items-center shadow-md">
+  <a routerLink="/paciente/mis-citas" routerLinkActive="font-bold underline">🩺 Mis Citas</a>
+  <a routerLink="/paciente/medicos-disponibles" routerLinkActive="font-bold underline">👨‍⚕️ Médicos</a>
+  <a routerLink="/paciente/perfil" routerLinkActive="font-bold underline">👤 Perfil</a>
+  
+  <button
+    (click)="logout()"
+    class="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded-lg shadow transition">
+    🚪 Salir
+  </button>
 </nav>

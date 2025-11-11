@@ -1,5 +1,6 @@
 import { Component, OnInit } from '@angular/core';
 import { AuthService } from '../../../core/services/auth.service';
+import { Router } from '@angular/router';
 
 
 @Component({
@@ -8,20 +9,8 @@ import { AuthService } from '../../../core/services/auth.service';
   templateUrl: './navbar.component.html',
   styleUrls: ['./navbar.component.css']
 })
-export class NavbarComponent implements OnInit {
-  roles: string[] = [];
-  isAdmin = false;
-  isMedico = false;
-  isPaciente = false;
-
-  constructor(private authService: AuthService) {}
-
-  ngOnInit(): void {
-    this.roles = this.authService.getUserRoles();
-    this.isAdmin = this.roles.includes('ROLE_ADMIN');
-    this.isMedico = this.roles.includes('ROLE_MEDICO');
-    this.isPaciente = this.roles.includes('ROLE_PACIENTE');
-  }
+export class NavbarComponent {
+  constructor(private authService: AuthService, private router: Router) {}
 
   logout() {
     this.authService.logout();

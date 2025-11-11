@@ -1,0 +1,82 @@
+/* 🎨 Contenedor general */
+:host {
+  display: block;
+  background-color: #F3F4F6;
+  font-family: 'Nunito', sans-serif;
+  transition: all 0.25s ease-in-out;
+}
+
+/* 🧭 Encabezado */
+h2 {
+  font-family: 'Inter', sans-serif;
+  font-weight: 700;
+  color: #1E293B;
+  letter-spacing: -0.02em;
+}
+
+/* 🩺 Tarjeta médico */
+.card-medico {
+  background-color: #FFFFFF;
+  border: 1px solid #E5E7EB;
+  border-radius: 14px;
+  padding: 1.25rem;
+  transition: all 0.25s ease;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+.card-medico:hover {
+  border-color: #3B82F6;
+  background-color: #F8FAFC;
+  transform: translateY(-3px);
+  box-shadow: 0 4px 10px rgba(59,130,246,0.2);
+}
+
+/* 🧾 Texto */
+.card-medico h3 {
+  font-family: 'Inter', sans-serif;
+  font-weight: 600;
+  color: #1D4ED8;
+}
+.card-medico p {
+  line-height: 1.5;
+}
+
+/* 💙 Botón Reservar */
+.btn-reservar {
+  display: block;
+  width: 100%;
+  background-color: #2563EB;
+  color: white;
+  font-weight: 600;
+  padding: 0.6rem 1.2rem;
+  border-radius: 10px;
+  box-shadow: 0 3px 6px rgba(37,99,235,0.3);
+  transition: all 0.25s ease;
+  text-align: center;
+}
+.btn-reservar:hover {
+  background-color: #1D4ED8;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 12px rgba(37,99,235,0.4);
+}
+.btn-reservar:active {
+  transform: scale(0.98);
+}
+
+/* 🩶 Botón volver */
+button.bg-gray-600 {
+  box-shadow: 0 2px 4px rgba(75,85,99,0.3);
+}
+button.bg-gray-600:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(55,65,81,0.35);
+}
+
+/* 📱 Responsive */
+@media (max-width: 640px) {
+  h2 {
+    font-size: 1.75rem;
+  }
+  .card-medico {
+    padding: 1rem;
+  }
+}

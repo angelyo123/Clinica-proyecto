@@ -1,0 +1,69 @@
+:host {
+  display: block;
+  background-color: #F5F6FA; /* gris perla */
+  font-family: 'Nunito', sans-serif;
+  transition: all 0.2s ease-in-out;
+  color: #1E1B4B; /* texto gris oscuro violeta */
+}
+
+/* ✨ Tarjetas de horarios */
+.horario-card {
+  background-color: #FFFFFF;
+  border: 1px solid #E4E0EC; /* borde lavanda suave */
+  border-radius: 12px;
+  transition: all 0.25s ease;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+.horario-card:hover {
+  border-color: #C4B5FD; /* lavanda medio */
+  background-color: #F3F0FF; /* morado muy claro */
+  transform: translateY(-2px);
+  box-shadow: 0 4px 10px rgba(139,92,246,0.25);
+}
+
+/* 💜 Horario seleccionado */
+.selected {
+  border-color: #8B5CF6 !important;
+  background-color: #EDE9FE !important;
+  box-shadow: 0 0 0 3px rgba(139,92,246,0.4);
+  transform: scale(1.02);
+}
+
+/* 🕓 Texto de horario */
+.text-primary {
+  color: #7C3AED;
+}
+
+/* 💾 Botón confirmar */
+.btn-confirmar {
+  background-color: #8B5CF6;
+  color: white;
+  font-weight: 600;
+  padding: 0.7rem 1.2rem;
+  border-radius: 10px;
+  box-shadow: 0 3px 6px rgba(139,92,246,0.3);
+  transition: all 0.25s ease;
+}
+.btn-confirmar:hover {
+  background-color: #7C3AED;
+  transform: translateY(-2px);
+  box-shadow: 0 5px 10px rgba(124,58,237,0.4);
+}
+.btn-confirmar:active {
+  transform: scale(0.98);
+}
+
+/* 🟢 Mensajes */
+.text-green-600 {
+  color: #10B981;
+}
+.text-red-600 {
+  color: #EF4444;
+}
+
+/* 📱 Responsive */
+@media (max-width: 768px) {
+  .grid {
+    grid-template-columns: 1fr !important;
+  }
+}

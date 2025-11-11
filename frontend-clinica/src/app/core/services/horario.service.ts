@@ -18,6 +18,7 @@ export class HorarioService {
       'Content-Type': 'application/json'
     });
   }
+  
 
   listar(): Observable<Horario[]> {
     return this.http.get<Horario[]>(this.apiUrl, { headers: this.getAuthHeaders() });
@@ -48,5 +49,14 @@ export class HorarioService {
     headers: this.getAuthHeaders()
   });
 }
+
+actualizarDisponibilidad(id: number, disponible: boolean): Observable<any> {
+  return this.http.put(
+    `${this.apiUrl}/${id}/disponibilidad/${disponible}`,
+    {}, // cuerpo vacío
+    { headers: this.getAuthHeaders() }
+  );
+}
+
 
 }

@@ -47,11 +47,13 @@ public class UsuarioService {
         Usuario nuevoUsuario = usuarioRepository.save(usuario);
 
         PacienteDatosDTO datosPaciente = new PacienteDatosDTO(
+                null,
                 request.getNombre(),
                 request.getDni(),
                 request.getTelefono(),
                 request.getUsername()
         );
+
 
         try {
             pacienteClient.crearPaciente(datosPaciente);

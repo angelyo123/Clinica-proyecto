@@ -75,6 +75,18 @@ export class AuthService {
   }
 }
 
+getPacienteId(): number | null {
+  const token = this.getToken();
+  if (!token) return null;
+
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    return payload.pacienteId || null;
+  } catch (error) {
+    console.error('Error al decodificar token:', error);
+    return null;
+  }
+}
 
   isAdmin(): boolean {
   return this.getUserRoles().includes('ROLE_ADMIN');

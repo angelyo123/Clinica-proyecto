@@ -1,0 +1,79 @@
+<div class="max-w-7xl mx-auto p-6 grid lg:grid-cols-3 gap-6">
+  <!-- 🩺 Panel izquierdo: Horarios -->
+  <div class="lg:col-span-2">
+    <div class="flex justify-between items-center mb-6">
+      <h2 class="text-2xl font-bold text-gray-800 flex items-center gap-2">
+        <span>📅</span> Horarios disponibles del médico
+      </h2>
+      <button
+        routerLink="/paciente/medicos-disponibles"
+        class="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg shadow">
+        ← Volver
+      </button>
+    </div>
+
+    <div *ngIf="loading" class="text-gray-500">Cargando horarios...</div>
+    <div *ngIf="error" class="text-red-600">{{ error }}</div>
+
+    <div *ngIf="!loading && horarios.length === 0" class="text-gray-600">
+      No hay horarios disponibles para este médico.
+    </div>
+
+    <!-- 🕒 Lista de horarios -->
+    <div *ngIf="!loading && horarios.length > 0" class="grid sm:grid-cols-2 md:grid-cols-3 gap-4">
+      <div
+        *ngFor="let h of horarios"
+        (click)="seleccionarHorario(h)"
+        [ngClass]="{
+          'border-blue-600 bg-blue-50 ring-2 ring-blue-400': h === horarioSeleccionado,
+          'border-gray-300 hover:border-blue-400 hover:bg-gray-50': h !== horarioSeleccionado
+        }"
+        class="cursor-pointer border rounded-lg p-4 shadow-sm transition"
+      >
+        <p class="font-semibold text-blue-700 flex items-center gap-2">
+          <span>📆</span> {{ h.fechaInicio | date:'EEEE, dd/MM/yyyy' }}
+        </p>
+        <p class="text-gray-700 mt-1">🕒 {{ h.horaInicio }} - {{ h.horaFin }}</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ✅ Panel derecho: Detalle del horario seleccionado -->
+  <div class="bg-white border border-gray-200 shadow-lg rounded-xl p-6 sticky top-6 h-fit">
+    <h3 class="text-xl font-semibold text-gray-800 mb-4 flex items-center gap-2">
+      <span>🩺</span> Detalle de la cita
+    </h3>
+
+    <div *ngIf="!horarioSeleccionado" class="text-gray-500 italic">
+      Selecciona un horario para ver los detalles aquí.
+    </div>
+
+    <div *ngIf="horarioSeleccionado" class="space-y-3">
+      <p class="text-gray-700">
+        <strong>📅 Fecha:</strong>
+        {{ horarioSeleccionado.fechaInicio | date:'EEEE, dd/MM/yyyy' }}
+      </p>
+
+      <p class="text-gray-700">
+        <strong>🕐 Hora:</strong>
+        {{ horarioSeleccionado.horaInicio }} - {{ horarioSeleccionado.horaFin }}
+      </p>
+
+      <p class="text-gray-700">
+        <strong>👨‍⚕️ Médico:</strong>
+        ID {{ medicoId }}
+      </p>
+
+      <p class="text-gray-700">
+        <strong>👤 Paciente:</strong>
+        {{ authService.getUsername() }}
+      </p>
+
+      <button
+        (click)="confirmarCita()"
+        class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-4 rounded-lg shadow transition">
+        ✅ Confirmar cita
+      </button>
+    </div>
+  </div>
+</div>

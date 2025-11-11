@@ -67,7 +67,7 @@ listarDetallesPorPaciente(pacienteId: number): Observable<Cita[]> {
 
   crearCita(cita: Cita): Observable<Cita> {
     // 👇 ya no duplicas /user/citas
-    return this.http.post<Cita>(`${this.apiUrl}/crear/detalle`, cita, { headers: this.getAuthHeaders() });
+    return this.http.post<Cita>(`${this.apiUrl}/crear`, cita, { headers: this.getAuthHeaders() });
   }
 
   actualizar(id: number, cita: Cita): Observable<Cita> {

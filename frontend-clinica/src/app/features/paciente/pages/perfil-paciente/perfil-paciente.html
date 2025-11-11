@@ -1,0 +1,43 @@
+<div class="max-w-3xl mx-auto mt-10 p-8 bg-gray-50 border border-gray-200 rounded-2xl shadow-sm">
+  <h2 class="text-3xl font-bold text-gray-800 mb-8 text-center">👤 Perfil del Paciente</h2>
+
+  <!-- 🔄 Estados -->
+  <div *ngIf="cargando" class="text-center text-gray-500 italic">
+    Cargando información...
+  </div>
+
+  <div *ngIf="error" class="text-center text-red-600 font-semibold">
+    {{ error }}
+  </div>
+
+  <!-- ✅ Datos -->
+  <div *ngIf="!cargando && paciente" class="divide-y divide-gray-200 bg-white rounded-xl shadow-inner p-6">
+    <div class="py-3 flex items-center justify-between">
+      <span class="font-semibold text-gray-600">🪪 Nombre</span>
+      <span class="text-gray-800">{{ paciente.nombre }}</span>
+    </div>
+
+    <div class="py-3 flex items-center justify-between">
+      <span class="font-semibold text-gray-600">🧾 DNI</span>
+      <span class="text-gray-800">{{ paciente.dni }}</span>
+    </div>
+
+    <div class="py-3 flex items-center justify-between">
+      <span class="font-semibold text-gray-600">📞 Teléfono</span>
+      <span class="text-gray-800">{{ paciente.telefono }}</span>
+    </div>
+
+    <div class="py-3 flex items-center justify-between">
+      <span class="font-semibold text-gray-600">👤 Usuario</span>
+      <span class="text-gray-800">{{ paciente.usuario || 'Sin usuario asignado' }}</span>
+    </div>
+
+    <div class="pt-6 text-center">
+      <button
+        class="btn-actualizar"
+        (click)="ngOnInit()">
+        🔄 Actualizar información
+      </button>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,125 @@
+/* 🌫 Fondo general */
+body {
+  font-family: 'Inter', 'Nunito', sans-serif;
+  background-color: #F5F6FA; /* gris perla */
+  color: #1E1B4B; /* gris-violeta oscuro */
+  transition: color 0.2s ease, background-color 0.2s ease;
+}
+
+/* 🩺 Contenedor principal */
+.container-citas {
+  background-color: #FFFFFF;
+  border: 1px solid #E4E0EC;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.04);
+  border-radius: 16px;
+  padding: 1.5rem;
+}
+
+/* 🧭 Botones de pestañas */
+button.tab {
+  background-color: #F3F0FF;
+  color: #1E1B4B;
+  border-radius: 10px;
+  padding: 0.5rem 1.25rem;
+  border: 1px solid transparent;
+  transition: background-color 0.25s ease, color 0.25s ease;
+  font-weight: 500; /* 👈 mantiene peso constante */
+  line-height: 1;   /* 👈 asegura altura estable */
+  height: 2.25rem;  /* 👈 fija altura, evita reflujo */
+}
+button.tab:hover {
+  background-color: #EDE9FE;
+  color: #1E1B4B;
+}
+button.tab.active {
+  background-color: #8B5CF6;
+  color: #FFFFFF;
+  font-weight: 500; /* 👈 evita engrosar texto al activar */
+}
+
+button.tab:focus-visible {
+  outline: 2px solid #C4B5FD;
+  outline-offset: 2px;
+}
+
+/* 🤖 Botón IA */
+a.chat-ia {
+  background: linear-gradient(135deg, #A78BFA, #7C3AED);
+  color: white;
+  text-align: center;
+  font-weight: 600;
+  padding: 1rem;
+  border-radius: 14px;
+  box-shadow: 0 4px 10px rgba(139,92,246,0.3);
+  transition: box-shadow 0.25s ease, transform 0.25s ease;
+}
+a.chat-ia:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 14px rgba(124,58,237,0.4);
+}
+
+/* 📋 Tabla de citas */
+table {
+  border-collapse: separate;
+  border-spacing: 0 6px;
+  width: 100%;
+}
+thead {
+  background-color: #F3F0FF;
+  color: #1E1B4B;
+  font-weight: 600;
+}
+tbody tr {
+  background-color: #FFFFFF;
+  border-radius: 12px;
+  border: 1px solid #E4E0EC;
+  transition: background-color 0.25s ease, box-shadow 0.25s ease;
+}
+tbody tr:hover {
+  background-color: #F9F8FF;
+  box-shadow: 0 2px 6px rgba(139,92,246,0.08);
+  /* ❌ sin transform: scale para evitar “vibración” */
+}
+
+/* 📱 Ajustes móviles */
+@media (max-width: 640px) {
+  table {
+    font-size: 0.9rem;
+  }
+}
+
+/* 🔤 Tipografía */
+h2 {
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: #1E1B4B;
+}
+p, span, td, th, button {
+  font-family: 'Nunito', sans-serif;
+  font-weight: 500;
+}
+
+/* 🩷 Estados */
+.estado-PENDIENTE  { color: #EAB308; font-weight: 600; }
+.estado-CONFIRMADA { color: #10B981; font-weight: 600; }
+.estado-EN_PROCESO { color: #8B5CF6; font-weight: 600; }
+.estado-COMPLETADA { color: #6B7280; font-weight: 600; }
+.estado-CANCELADA  { color: #EF4444; font-weight: 600; }
+
+/* 💫 Botones acciones tabla */
+button.bg-yellow-500 {
+  background-color: #C084FC;
+  transition: background-color 0.25s ease, box-shadow 0.25s ease;
+}
+button.bg-yellow-500:hover {
+  background-color: #A78BFA;
+  box-shadow: 0 3px 6px rgba(139,92,246,0.2);
+}
+button.bg-red-600 {
+  background-color: #E11D48;
+  transition: background-color 0.25s ease, box-shadow 0.25s ease;
+}
+button.bg-red-600:hover {
+  background-color: #BE123C;
+  box-shadow: 0 3px 6px rgba(239,68,68,0.3);
+}

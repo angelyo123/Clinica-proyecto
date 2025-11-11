@@ -5,5 +5,5 @@ export interface Paciente {
   nombre: string;
   dni: string;
   telefono: string;
-  usuario?: Usuario;
+  usuario?: string; // 👈 en vez de Usuario
 }

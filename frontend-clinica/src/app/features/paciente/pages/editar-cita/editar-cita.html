@@ -1,0 +1,56 @@
+<div class="max-w-6xl mx-auto p-6 bg-gray-50 rounded-xl shadow-sm border border-gray-200">
+  <h2 class="text-2xl font-bold text-gray-800 mb-4">🕓 Reprogramar cita</h2>
+
+  <div *ngIf="loading" class="text-gray-500 italic">Cargando...</div>
+
+  <div *ngIf="!loading && cita" class="grid md:grid-cols-[2fr_1fr] gap-6">
+    <!-- 🔹 Columna izquierda -->
+    <div>
+      <p class="text-gray-700 mb-4">
+        <strong class="text-gray-900">Médico:</strong> {{ cita.medico?.nombre }}<br>
+        <strong class="text-gray-900">Especialidad:</strong> {{ cita.medico?.especialidad }}
+      </p>
+
+      <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div
+          *ngFor="let h of horarios"
+          (click)="seleccionarHorario(h)"
+          [ngClass]="{'selected': h === horarioSeleccionado}"
+          class="horario-card cursor-pointer border rounded-lg p-4 shadow-sm transition"
+        >
+          <p class="font-semibold text-primary flex items-center gap-1">
+            📅 {{ h.fechaInicio | date:'EEEE, dd/MM/yyyy' }}
+          </p>
+          <p class="text-gray-700 mt-1 flex items-center gap-1">⏰ {{ h.horaInicio }} - {{ h.horaFin }}</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- 🔸 Columna derecha -->
+    <div *ngIf="horarioSeleccionado" class="bg-white rounded-lg border border-gray-200 p-5 shadow-md">
+      <h3 class="text-xl font-semibold text-gray-800 mb-3">🗓️ Detalle del horario</h3>
+      <p class="text-gray-700 mb-2">
+        <strong>Fecha:</strong> {{ horarioSeleccionado.fechaInicio | date:'fullDate' }}
+      </p>
+      <p class="text-gray-700 mb-2">
+        <strong>Hora:</strong> {{ horarioSeleccionado.horaInicio }} - {{ horarioSeleccionado.horaFin }}
+      </p>
+      <p class="text-gray-700 mb-4">
+        <strong>Médico:</strong> {{ cita.medico?.nombre }}
+      </p>
+
+      <button (click)="confirmarCambio()" class="btn-confirmar w-full">
+        💾 Confirmar cambio
+      </button>
+
+      <p *ngIf="mensaje"
+         [ngClass]="{
+           'text-green-600': mensajeTipo === 'success',
+           'text-red-600': mensajeTipo === 'error'
+         }"
+         class="mt-3 font-semibold text-center">
+        {{ mensaje }}
+      </p>
+    </div>
+  </div>
+</div>
