@@ -8,5 +8,6 @@
     <file url="file://$PROJECT_DIR$/Pacientes-Service/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/auth-service/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/backend-clinica/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/hc/src/main/java" charset="UTF-8" />
   </component>
 </project>

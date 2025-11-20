@@ -3,7 +3,7 @@
   <component name="CompilerConfiguration">
     <annotationProcessing>
       <profile default="true" name="Default" enabled="true" />
-      <profile name="Annotation profile for backend-clinica" enabled="true">
+      <profile name="Annotation profile for hc-service" enabled="true">
         <sourceOutputDir name="target/generated-sources/annotations" />
         <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
         <outputRelativeToContentRoot value="true" />
@@ -14,6 +14,7 @@
         <module name="Medicos-Service" />
         <module name="auth-service" />
         <module name="Citas-Service" />
+        <module name="hc-service" />
         <module name="Pacientes-Service" />
         <module name="Horario-Service" />
         <module name="backend-clinica" />
@@ -29,6 +30,7 @@
       <module name="Pacientes-Service" options="-parameters" />
       <module name="auth-service" options="-parameters" />
       <module name="backend-clinica" options="-parameters" />
+      <module name="hc-service" options="-parameters" />
     </option>
   </component>
 </project>
