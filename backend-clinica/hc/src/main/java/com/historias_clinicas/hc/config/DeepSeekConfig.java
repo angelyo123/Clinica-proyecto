@@ -4,6 +4,7 @@ import com.historias_clinicas.hc.ia.DeepSeekClient;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.web.client.RestTemplate;
 import org.springframework.web.reactive.function.client.WebClient;
 
 @Configuration
@@ -22,7 +23,10 @@ public class DeepSeekConfig {
     }
 
     @Bean
-    public DeepSeekClient deepSeekClient(WebClient deepSeekWebClient) {
-        return new DeepSeekClient(deepSeekWebClient);
+    public DeepSeekClient deepSeekClient(
+            WebClient deepSeekWebClient,
+            RestTemplate deepSeekRestTemplate
+    ) {
+        return new DeepSeekClient(deepSeekWebClient, deepSeekRestTemplate);
     }
 }

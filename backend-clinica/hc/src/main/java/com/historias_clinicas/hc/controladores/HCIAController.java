@@ -34,6 +34,7 @@ public class HCIAController {
     private final PlantillaCampoRepository campoRepo;
     private final IaService iaService;
     private final PdfGenerator pdfGenerator;
+    private final PlantillaProcessorService plantillaProcessorService;
 
     // -------------------------------------------------------------
     // 1. PREVISUALIZACIÓN DESDE TEXTO
@@ -57,8 +58,11 @@ public class HCIAController {
                     .toList();
 
             // 2. Interpretar texto con IA usando esa lista de campos
-            Map<String,Object> jsonIA =
-                    textInterpreter.interpretarTexto(texto, camposPlantilla);
+            Map<String,Object> jsonIA = textInterpreter.interpretarTexto(
+                    texto,
+                    camposPlantilla,
+                    plantillaProcessorService.getListaCeldasParaDeepSeek()
+            );
 
             // 3. A plano (Object -> String)
             Map<String,String> jsonPlano = mappingEngine.aPlano(jsonIA);
@@ -126,20 +130,44 @@ public class HCIAController {
                     .toList();
 
             // 3. IA interpreta texto usando ESA LISTA (campo → valor)
-            Map<String,Object> jsonIA = textInterpreter.interpretarTexto(texto, camposPlantilla);
+            Map<String,Object> jsonIA = textInterpreter.interpretarTexto(
+                    texto,
+                    camposPlantilla,
+                    plantillaProcessorService.getListaCeldasParaDeepSeek()
+            );
 
             // 4. Convertir a Map plano (String → String)
             Map<String,String> datosPlano = mappingEngine.aPlano(jsonIA);
 
             // 5. Mapear IA → Plantilla
-            var mapeo = mappingEngine.mapearDatosAPlantilla(
-                    datosPlano,
-                    plantillaId
-            );
+            var mapeo = mappingEngine.mapearDatosAPlantilla(datosPlano, plantillaId);
 
+            // >>>>>> MISMA RESPUESTA QUE TEXTO-PRELIMINAR <<<<<<
+
+            // 5A. LISTA para el front
+            List<Map<String, Object>> lista = mapeo.entrySet().stream()
+                    .map(e -> {
+                        Map<String, Object> item = new HashMap<>();
+                        item.put("campoId", e.getKey().getId());
+                        item.put("nombre", e.getKey().getNombreCampo());
+                        item.put("valor", e.getValue());
+                        return item;
+                    })
+                    .toList();
+
+            // 5B. JSON EXACTO que /confirmar necesita
+            Map<String, String> jsonConfirmar = new LinkedHashMap<>();
+            mapeo.forEach((campo, valor) -> {
+                jsonConfirmar.put(campo.getNombreCampo(), valor);
+            });
+
+            // 6. MISMA estructura
             return ResponseEntity.ok(Map.of(
                     "mensaje", "Previsualización generada desde imagen",
-                    "data", mapeo
+                    "data", Map.of(
+                            "lista", lista,
+                            "jsonConfirmar", jsonConfirmar
+                    )
             ));
 
         } catch (Exception e) {

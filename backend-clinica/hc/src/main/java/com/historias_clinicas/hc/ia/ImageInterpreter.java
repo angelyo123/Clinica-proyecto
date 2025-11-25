@@ -14,23 +14,15 @@ public class ImageInterpreter {
 
     public String leerImagen(MultipartFile file) throws Exception {
 
-        // 1. Convertir imagen a base64
         String base64 = Base64.getEncoder().encodeToString(file.getBytes());
 
-        // 2. Prompt para DeepSeek Vision
-        String prompt = """
-                Eres un médico experto capaz de analizar imágenes de historias clínicas manuscritas o impresas.
+        String instrucciones = """
+            Extrae TODO el texto visible en la imagen.
+            No inventes información.
+            No completes huecos.
+            Devuelve únicamente texto plano.
+            """;
 
-                Te enviaré una imagen codificada en base64.
-                Extrae TODO el texto de forma clara, sin inventar nada.
-                Devuelve SOLO el texto plano, sin JSON.
-
-                Imagen codificada:
-                data:%s;base64,%s
-                """
-                .formatted(file.getContentType(), base64);
-
-        // 3. DeepSeek devuelve texto
-        return deepSeekClient.completar(prompt);
+        return deepSeekClient.completarImagen(base64, instrucciones);
     }
 }

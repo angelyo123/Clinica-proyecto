@@ -8,6 +8,7 @@ import com.historias_clinicas.hc.repositorios.HistoriaClinicaVersionRepository;
 import com.historias_clinicas.hc.repositorios.CampoValorRepository;
 
 import com.historias_clinicas.hc.repositorios.PlantillaCampoRepository;
+import com.historias_clinicas.hc.servicios.PlantillaProcessorService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -30,6 +31,7 @@ public class IaService {
     private final HistoriaClinicaVersionRepository versionRepo;
     private final CampoValorRepository campoValorRepo;
     private final PlantillaCampoRepository campoRepo;
+    private final PlantillaProcessorService plantillaProcessorService;
 
     private final DeepSeekClient deepSeek;  // <--- USO DIRECTO DE DEEPSEEK
 
@@ -52,8 +54,11 @@ public class IaService {
                 .collect(Collectors.toList());
 
         // 🔥 Interpretar texto usando ESA LISTA
-        Map<String, Object> jsonIA =
-                textInterpreter.interpretarTexto(texto, camposPlantilla);
+        Map<String, Object> jsonIA = textInterpreter.interpretarTexto(
+                texto,
+                camposPlantilla,
+                plantillaProcessorService.getListaCeldasParaDeepSeek()
+        );
 
         Map<String, String> jsonPlano = mappingEngine.aPlano(jsonIA);
 
@@ -90,8 +95,11 @@ public class IaService {
                 .collect(Collectors.toList());
 
         // 🔥 Interpretar texto de la imagen con los campos
-        Map<String, Object> jsonIA =
-                textInterpreter.interpretarTexto(texto, camposPlantilla);
+        Map<String, Object> jsonIA = textInterpreter.interpretarTexto(
+                texto,
+                camposPlantilla,
+                plantillaProcessorService.getListaCeldasParaDeepSeek()
+        );
 
         Map<String, String> jsonPlano = mappingEngine.aPlano(jsonIA);
 
