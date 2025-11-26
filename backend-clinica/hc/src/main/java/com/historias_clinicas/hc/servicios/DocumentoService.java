@@ -8,9 +8,12 @@ import com.historias_clinicas.hc.generadores.WordGenerator;
 import com.historias_clinicas.hc.ia.MappingEngine;
 import com.historias_clinicas.hc.repositorios.CampoValorRepository;
 import com.historias_clinicas.hc.repositorios.HistoriaClinicaVersionRepository;
+import com.historias_clinicas.hc.repositorios.PlantillaCampoRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 @Service
@@ -18,15 +21,14 @@ import java.util.Map;
 public class DocumentoService {
 
     private final CampoValorRepository campoValorRepo;
+    private final PlantillaCampoRepository campoRepo;
     private final WordGenerator wordGenerator;
     private final PdfGenerator pdfGenerator;
-    private final MappingEngine mappingEngine;
     private final HistoriaClinicaVersionRepository versionRepo;
 
-
-    // ============================================================
-    // GUARDAR VALORES CONFIRMADOS
-    // ============================================================
+    // ============================================================================
+    // GUARDAR VALORES CONFIRMADOS (jsonConfirmar → BD)
+    // ============================================================================
     public Map<PlantillaCampo, String> guardarValores(
             HistoriaClinicaVersion version,
             Map<String, String> valoresPlano
@@ -37,13 +39,28 @@ public class DocumentoService {
 
         Long plantillaId = version.getHistoriaClinica().getPlantilla().getId();
 
-        // 1. Convertir claves (String) → PlantillaCampo mediante Matching exacto
-        Map<PlantillaCampo, String> valoresIA =
-                mappingEngine.mapearDatosAPlantilla(valoresPlano, plantillaId);
+        // 1️⃣ Traer TODOS los campos de la plantilla
+        List<PlantillaCampo> campos = campoRepo.findBySeccion_Plantilla_Id(plantillaId);
 
-        // 2. Guardar en BD (evitar duplicados)
-        valoresIA.forEach((campo, valor) -> {
+        // 2️⃣ Convertir jsonConfirmar → Map<PlantillaCampo,String>
+        Map<PlantillaCampo, String> valoresIA = new LinkedHashMap<>();
 
+        valoresPlano.forEach((nombreCampo, textoCompletado) -> {
+
+            // Buscar el campo exacto por nombre
+            PlantillaCampo campo = campos.stream()
+                    .filter(c -> c.getNombreCampo().equals(nombreCampo))
+                    .findFirst()
+                    .orElse(null);
+
+            if (campo == null) {
+                // No existe el campo — simplemente ignorar
+                return;
+            }
+
+            valoresIA.put(campo, textoCompletado);
+
+            // Guardar / actualizar en BD (evitar duplicados)
             CampoValor existente = campoValorRepo
                     .findByVersionIdAndCampoId(version.getId(), campo.getId())
                     .orElse(null);
@@ -55,45 +72,37 @@ public class DocumentoService {
                         .build();
             }
 
-            existente.setValor(valor);
+            existente.setValor(textoCompletado);
             campoValorRepo.save(existente);
         });
 
         return valoresIA;
     }
 
-
-    // ============================================================
-    // GENERAR PDF FINAL
-    // ============================================================
-    public byte[] generarPdf(HistoriaClinicaVersion version,
-                             Map<PlantillaCampo, String> valoresIA) {
+    public byte[] generarWord(HistoriaClinicaVersion version,
+                              Map<PlantillaCampo, String> valoresIA) {
 
         try {
             if (version.getHistoriaClinica().getPlantilla() == null)
                 throw new RuntimeException("La versión no tiene plantilla asociada.");
 
-            // 1. obtener bytes de la plantilla original
+            // 1️⃣ obtener bytes del Word plantilla original
             byte[] plantillaBytes = version.getHistoriaClinica()
                     .getPlantilla()
                     .getArchivoOriginal();
 
-            // 2. generar word final con datos rellenos
+            // 2️⃣ generar Word COMPLETADO
             byte[] wordFinal = wordGenerator.generarDocumento(plantillaBytes, valoresIA);
 
-            // 3. convertir word final a PDF
-            byte[] pdfFinal = pdfGenerator.convertToPdf(wordFinal);
-
-            // 4. Persistir en BD
+            // 3️⃣ guardar en BD solo si quieres
             version.setWordFinal(wordFinal);
-            version.setPdfFinal(pdfFinal);
             versionRepo.save(version);
 
-            return pdfFinal;
+            return wordFinal;
 
         } catch (Exception e) {
-            throw new RuntimeException("Error generando PDF: " + e.getMessage(), e);
+            e.printStackTrace();   // <-- AGREGA ESTO
+            throw new RuntimeException("Error generando Word: " + e.getMessage(), e);
         }
     }
-
 }

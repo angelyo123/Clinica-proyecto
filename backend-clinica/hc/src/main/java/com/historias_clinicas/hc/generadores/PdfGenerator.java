@@ -21,16 +21,20 @@ public class PdfGenerator {
     @PostConstruct
     public void init() {
         try {
+            System.out.println(">>> Iniciando LibreOffice...");
             officeManager = LocalOfficeManager.builder()
-                    .install()   // instala LibreOffice si no existe
+                    .install()
                     .build();
 
             officeManager.start();
+            System.out.println(">>> LibreOffice iniciado correctamente.");
 
         } catch (Exception e) {
+            e.printStackTrace();
             throw new RuntimeException("LibreOffice no pudo iniciar: " + e.getMessage());
         }
     }
+
 
     @PreDestroy
     public void shutdown() {

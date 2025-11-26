@@ -47,17 +47,25 @@ public class IaService {
 
         Long plantillaId = version.getHistoriaClinica().getPlantilla().getId();
 
-        // 🔥 Obtener lista de campos exactos detectados por POI
-        List<String> camposPlantilla = campoRepo.findBySeccion_Plantilla_Id(plantillaId)
+        List<Map<String,Object>> camposPlantilla = campoRepo.findBySeccion_Plantilla_Id(plantillaId)
                 .stream()
-                .map(PlantillaCampo::getNombreCampo)
+                .map(c -> {
+                    Map<String,Object> m = new HashMap<>();
+                    m.put("nombre", c.getNombreCampo());
+                    m.put("textoOriginal", c.getTextoOriginal());
+                    m.put("tabla", c.getIndexTabla());
+                    m.put("fila", c.getIndexFila());
+                    m.put("columna", c.getIndexCelda());
+                    m.put("parrafo", c.getIndexParrafo());
+                    return m;
+                })
                 .collect(Collectors.toList());
+
 
         // 🔥 Interpretar texto usando ESA LISTA
         Map<String, Object> jsonIA = textInterpreter.interpretarTexto(
                 texto,
-                camposPlantilla,
-                plantillaProcessorService.getListaCeldasParaDeepSeek()
+                camposPlantilla
         );
 
         Map<String, String> jsonPlano = mappingEngine.aPlano(jsonIA);
@@ -88,17 +96,25 @@ public class IaService {
         // Leer texto desde imagen con OCR/IA
         String texto = imageInterpreter.leerImagen(file);
 
-        // 🔥 Obtener lista de campos exactos detectados por POI
-        List<String> camposPlantilla = campoRepo.findBySeccion_Plantilla_Id(plantillaId)
+        List<Map<String,Object>> camposPlantilla = campoRepo.findBySeccion_Plantilla_Id(plantillaId)
                 .stream()
-                .map(PlantillaCampo::getNombreCampo)
+                .map(c -> {
+                    Map<String,Object> m = new HashMap<>();
+                    m.put("nombre", c.getNombreCampo());
+                    m.put("textoOriginal", c.getTextoOriginal());
+                    m.put("tabla", c.getIndexTabla());
+                    m.put("fila", c.getIndexFila());
+                    m.put("columna", c.getIndexCelda());
+                    m.put("parrafo", c.getIndexParrafo());
+                    return m;
+                })
                 .collect(Collectors.toList());
+
 
         // 🔥 Interpretar texto de la imagen con los campos
         Map<String, Object> jsonIA = textInterpreter.interpretarTexto(
                 texto,
-                camposPlantilla,
-                plantillaProcessorService.getListaCeldasParaDeepSeek()
+                camposPlantilla
         );
 
         Map<String, String> jsonPlano = mappingEngine.aPlano(jsonIA);

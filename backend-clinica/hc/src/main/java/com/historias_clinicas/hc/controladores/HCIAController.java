@@ -20,6 +20,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/hc/version")
@@ -51,46 +52,43 @@ public class HCIAController {
 
             Long plantillaId = version.getHistoriaClinica().getPlantilla().getId();
 
-            // 1. Obtener lista de campos EXACTOS detectados por POI
-            List<String> camposPlantilla = campoRepo.findBySeccion_Plantilla_Id(plantillaId)
-                    .stream()
-                    .map(PlantillaCampo::getNombreCampo)
-                    .toList();
+            // 1. OBTENER TODOS LOS CAMPOS DETECTADOS POR /analizar
+            List<PlantillaCampo> campos = campoRepo.findBySeccion_Plantilla_Id(plantillaId);
 
-            // 2. Interpretar texto con IA usando esa lista de campos
-            Map<String,Object> jsonIA = textInterpreter.interpretarTexto(
-                    texto,
-                    camposPlantilla,
-                    plantillaProcessorService.getListaCeldasParaDeepSeek()
-            );
-
-            // 3. A plano (Object -> String)
-            Map<String,String> jsonPlano = mappingEngine.aPlano(jsonIA);
-
-            // 4. IA → Plantilla
-            var mapeo = mappingEngine.mapearDatosAPlantilla(
-                    jsonPlano,
-                    plantillaId
-            );
-
-            // 5A. LISTA bonita para el front
-            List<Map<String, Object>> lista = mapeo.entrySet().stream()
-                    .map(e -> {
-                        Map<String, Object> item = new HashMap<>();
-                        item.put("campoId", e.getKey().getId());
-                        item.put("nombre", e.getKey().getNombreCampo());
-                        item.put("valor", e.getValue());
-                        return item;
+            // 2. CONSTRUIR LA LISTA QUE LA IA NECESITA
+            List<Map<String,Object>> camposPlantilla = campos.stream()
+                    .map(c -> {
+                        Map<String,Object> m = new HashMap<>();
+                        m.put("nombre", c.getNombreCampo());
+                        m.put("textoOriginal", c.getTextoOriginal());
+                        m.put("tabla", c.getIndexTabla());
+                        m.put("fila", c.getIndexFila());
+                        m.put("columna", c.getIndexCelda());
+                        m.put("parrafo", c.getIndexParrafo());
+                        return m;
                     })
                     .toList();
 
-            // 5B. JSON EXACTO que /confirmar necesita
-            Map<String, String> jsonConfirmar = new LinkedHashMap<>();
-            mapeo.forEach((campo, valor) -> {
-                jsonConfirmar.put(campo.getNombreCampo(), valor);
-            });
 
-            // 6. Devolver ambas representaciones
+            // 3. IA interpreta texto usando ESTA LISTA (campo → textoOriginal completado)
+            Map<String,Object> jsonIA = textInterpreter.interpretarTexto(
+                    texto,
+                    camposPlantilla
+            );
+
+            // 4. LISTA bonita para el front (con IDs)
+            List<Map<String,Object>> lista = campos.stream()
+                    .map(c -> Map.of(
+                            "campoId", c.getId(),
+                            "nombre", c.getNombreCampo(),
+                            "valor", jsonIA.getOrDefault(c.getNombreCampo(), c.getTextoOriginal())
+                    ))
+                    .toList();
+
+            // 5. JSON EXACTO que /confirmar necesita
+            Map<String,String> jsonConfirmar = new LinkedHashMap<>();
+            jsonIA.forEach((k,v) -> jsonConfirmar.put(k, v.toString()));
+
             return ResponseEntity.ok(Map.of(
                     "mensaje", "Previsualización generada desde texto",
                     "data", Map.of(
@@ -100,8 +98,7 @@ public class HCIAController {
             ));
 
         } catch (Exception e) {
-            return ResponseEntity.internalServerError()
-                    .body(Map.of("error", e.getMessage()));
+            return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage()));
         }
     }
 
@@ -124,16 +121,25 @@ public class HCIAController {
             String texto = imageInterpreter.leerImagen(file);
 
             // 2. Obtener lista de campos EXACTOS detectados por POI
-            List<String> camposPlantilla = campoRepo.findBySeccion_Plantilla_Id(plantillaId)
+            List<Map<String,Object>> camposPlantilla = campoRepo.findBySeccion_Plantilla_Id(plantillaId)
                     .stream()
-                    .map(PlantillaCampo::getNombreCampo)
-                    .toList();
+                    .map(c -> {
+                        Map<String,Object> m = new HashMap<>();
+                        m.put("nombre", c.getNombreCampo());
+                        m.put("textoOriginal", c.getTextoOriginal());
+                        m.put("tabla", c.getIndexTabla());
+                        m.put("fila", c.getIndexFila());
+                        m.put("columna", c.getIndexCelda());
+                        m.put("parrafo", c.getIndexParrafo());
+                        return m;
+                    })
+                    .collect(Collectors.toList());
+
 
             // 3. IA interpreta texto usando ESA LISTA (campo → valor)
             Map<String,Object> jsonIA = textInterpreter.interpretarTexto(
                     texto,
-                    camposPlantilla,
-                    plantillaProcessorService.getListaCeldasParaDeepSeek()
+                    camposPlantilla
             );
 
             // 4. Convertir a Map plano (String → String)
@@ -181,7 +187,7 @@ public class HCIAController {
     // -------------------------------------------------------------
     @PostMapping(
             value = "/{versionId}/confirmar",
-            produces = "application/pdf"
+            produces = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
     )
     public ResponseEntity<byte[]> confirmarDescarga(
             @PathVariable Long versionId,
@@ -192,29 +198,22 @@ public class HCIAController {
             var version = versionRepo.findById(versionId)
                     .orElseThrow(() -> new RuntimeException("Versión no encontrada"));
 
-            // ==========================================================
-            // 1. GUARDAR VALORES DEFINITIVOS
-            // ==========================================================
-            // Este método convierte:
-            // { "edad": "73", "pa": "140/85", ... }
-            // en:
-            // { PlantillaCampo → "valor" }
             Map<PlantillaCampo, String> valoresIA =
                     documentoService.guardarValores(version, valoresPlano);
 
-            // ==========================================================
-            // 2. GENERAR PDF FINAL DESDE EL WORD COMPLETADO
-            // ==========================================================
-            byte[] pdf = documentoService.generarPdf(version, valoresIA);
+            byte[] word = documentoService.generarWord(version, valoresIA);
 
             return ResponseEntity.ok()
-                    .header("Content-Type", "application/pdf")
+                    .header("Content-Type",
+                            "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
                     .header("Content-Disposition",
-                            "attachment; filename=HC_" + versionId + ".pdf")
-                    .body(pdf);
+                            "attachment; filename=HC_" + versionId + ".docx")
+                    .body(word);
 
         } catch (Exception e) {
-            return ResponseEntity.internalServerError().body(null);
+            e.printStackTrace();
+            return ResponseEntity.internalServerError()
+                    .body(("ERROR: " + e.getMessage()).getBytes());
         }
     }
 }
