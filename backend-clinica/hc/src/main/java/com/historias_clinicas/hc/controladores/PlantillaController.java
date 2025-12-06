@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.Base64;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -61,26 +62,38 @@ public class PlantillaController {
                             ? (List<Map<String, Object>>) estructuraIA.get("_statsBloques")
                             : List.of();
 
+            if (estructuraIA == null) {
+                estructuraIA = Map.of(); // mapa vacío
+            }
+
             int totalCampos = estructuraIA.size() - statsBloques.size(); // sin _statsBloques
 
             // ============================================================
             // 🟦 Respuesta Clean + Métricas
             // ============================================================
-            Map<String, Object> body = Map.of(
-                    "mensaje", "Plantilla analizada correctamente",
-                    "duracion_ms", totalMs,
-                    "bloquesProcesados", statsBloques.size(),
-                    "camposDetectados", totalCampos,
-                    "bloques", statsBloques,
-                    "data", resultado
-            );
+
+
+            Map<String, Object> body = new LinkedHashMap<>();
+            body.put("mensaje", "Plantilla analizada correctamente");
+            body.put("duracion_ms", totalMs);
+            body.put("bloquesProcesados", statsBloques.size());
+            body.put("camposDetectados", totalCampos);
+            body.put("bloques", statsBloques);
+            body.put("data", resultado);
+
 
             return ResponseEntity.ok(body);
 
         } catch (Exception e) {
-            return ResponseEntity.internalServerError().body(
-                    Map.of("error", e.getMessage())
-            );
+            e.printStackTrace();  // ⬅️ LOG REAL
+
+            Map<String, Object> error = new LinkedHashMap<>();
+            error.put("error", e.getMessage() != null ? e.getMessage() : "Error desconocido");
+            error.put("detalle", e.toString());           // <-- AQUI MANDAMOS LA EXCEPCIÓN REAL
+            error.put("causa", e.getCause() != null ? e.getCause().toString() : null);
+
+            return ResponseEntity.internalServerError().body(error);
+
         }
     }
 

@@ -49,6 +49,184 @@ public class DeepSeekClient {
     }
 
 
+    public static final String IA_TEXT_FILLER_PROMPT = """
+
+Eres un sistema experto en interpretación de texto clínico.
+
+RECIBES:
+- Un texto clínico libre escrito por un médico.
+- Una lista de campos extraídos desde una plantilla. Cada campo contiene:
+  {
+    "nombre": "...",
+    "textoOriginal": "...",
+    "tipo": "texto | checkbox | ros_item | celda_llenable",
+    "descripcion": "qué información representa este campo"
+  }
+
+TU TAREA:
+Interpretar el texto clínico y determinar si en él aparece información relevante
+para cada campo, basándote exclusivamente en la DESCRIPCIÓN del campo y en su TIPO.
+
+=====================================================================
+🔵 REGLAS GENERALES
+=====================================================================
+
+1) No uses patrones estáticos ni dependas del formato del documento.
+2) No inventes información que el texto clínico no contenga.
+3) No infieras valores implícitos: si no está claro, no completes el campo.
+4) No agregues explicaciones, texto adicional ni etiquetas: solo valores puros.
+
+=====================================================================
+🔵 COMPORTAMIENTO POR TIPO DE CAMPO
+=====================================================================
+
+1) tipo = "texto"
+   → Extrae únicamente el contenido que el médico escribió relacionado
+     con la descripción del campo.
+   → Devuelve solo el valor, sin etiquetas ni frases completas.
+   → Si no hay una información claramente expresada → NO devuelvas valor.
+
+2) tipo = "checkbox"
+   → Si el texto clínico afirma el hallazgo descrito → "marcado".
+   → Si el texto clínico niega el hallazgo descrito → "no".
+   → Si el texto no menciona nada → NO devuelvas valor.
+
+3) tipo = "ros_item"
+   → Interpreta como un ítem que puede estar presente o ausente.
+   → Si el texto menciona explícitamente el síntoma/hallazgo → "marcado".
+   → Si el texto lo niega de manera clara → "no".
+   → Si no hay mención → NO devuelvas valor.
+
+4) tipo = "celda_llenable"
+   → Extrae el valor que el médico escribió relacionado con la descripción.
+   → Si no hay un valor explícito → NO devuelvas valor.
+
+=====================================================================
+🔴 PROHIBIDO
+=====================================================================
+
+- Para campos de tipo "texto": No devolver frases completas. Solo el valor puntual (ej: "anictéricas", "rosadas").
+- Para campos de tipo "checkbox" y "ros_item": No generar texto adicional.
+- ❗ Para campos de tipo "celda_llenable": SÍ está permitido devolver valores compuestos o frases clínicas completas si representan el estado del hallazgo (ej: "presente y de buena amplitud (++).").
+- No inventar datos clínicos.
+- No inferir valores no expresados.
+- No agregar explicaciones adicionales.
+
+=====================================================================
+📦 FORMATO DE SALIDA
+=====================================================================
+
+Devuelve exclusivamente un JSON:
+
+{
+  "nombre_campo_1": "valor",
+  "nombre_campo_2": "valor",
+  ...
+}
+
+Si ningún campo puede completarse, devuelve "{}".
+
+""";
+
+    public static final String IA_FIELD_ANALYZER_PROMPT = """
+
+Eres un analizador universal de formularios clínicos.
+
+Recibes un JSON con tablas, filas, celdas y texto.
+
+Tu única tarea es identificar los ELEMENTOS cuya función dentro del formulario
+es PEDIR un dato, una respuesta o una selección por parte del médico.
+
+A eso lo llamamos “campo rellenable”.
+
+=====================================================================
+🔵 CRITERIO UNIVERSAL (basado en función, no en contenido)
+=====================================================================
+
+Un elemento es un campo rellenable SI Y SOLO SI su propósito es que el médico:
+
+1) Escriba un valor,
+2) Marque una opción, o
+3) Seleccione presencia/ausencia de un hallazgo.
+
+Este criterio depende únicamente de la función del elemento dentro de la estructura
+del formulario, no de palabras específicas, formatos, idioma o estilo visual.
+
+=====================================================================
+🔵 MANEJO UNIVERSAL DE TABLAS (sin heurísticas)
+=====================================================================
+
+Cuando una tabla presenta:
+
+- una fila con varias celdas que contienen texto (actúan como etiquetas),
+- y las filas inmediatamente debajo contienen celdas VACÍAS en esas mismas columnas,
+
+ENTONCES toda celda vacía en esas columnas representa un CAMPO RELLENABLE.
+
+La celda superior proporciona la etiqueta del campo.
+La primera celda con texto en la fila actual (si existe) funciona como modificador
+(opciones como “Derecho”, “Izquierdo”, “Día 1”, “Resultado”, etc.).
+
+Esto es una regla estructural universal aplicable a cualquier formulario clínico.
+
+=====================================================================
+🔵 OTROS CASOS DE CAMPOS RELLENABLES
+=====================================================================
+
+Se consideran también campos:
+
+- Textos que terminan en ":" porque solicitan ingresar un valor.
+- Textos que contienen "( )" u otros indicadores de selección.
+- Etiquetas acompañadas de espacio vacío dentro de la misma fila o celda.
+- Listas de opciones seleccionables típicas de exámenes clínicos.
+- Celdas vacías cuya función en el formulario es recibir un dato.
+
+=====================================================================
+🔴 NO son campos rellenable
+=====================================================================
+
+Descarta (NO son campos):
+
+- Títulos o encabezados generales.
+- Textos narrativos ya completos que no esperan respuesta.
+- Descripciones que informan pero no solicitan llenado.
+- Cualquier componente cuyo propósito no sea pedir un dato.
+
+IMPORTANTE:
+No decidas por estilo, mayúsculas, número de palabras, color, tamaño, decoración,
+ni por su contenido literal. Decide SOLO por su función dentro del formulario.
+
+=====================================================================
+📦 SALIDA
+=====================================================================
+
+Devuelve exclusivamente un JSON con la estructura:
+
+{
+  "nombre_campo": {
+    "textoOriginal": "...",
+    "tabla": <int>,
+    "fila": <int>,
+    "columna": <int>,
+    "itemIndex": <int>,
+    "tipo": "texto | checkbox | ros_item | celda_llenable",
+    "descripcion": "qué se debe llenar aquí"
+  }
+}
+
+- No incluyas texto fuera del JSON.
+- Usa itemIndex comenzando desde 0, incrementando si hay múltiples elementos dentro
+  de la misma celda o fila.
+- La descripción debe explicar brevemente qué información debe ir en ese campo.
+
+Todas tus decisiones deben basarse únicamente en la función del elemento:
+si el formulario espera que el médico ponga un dato → es un campo.
+Si no espera nada → no es un campo.
+
+""";
+
+
+
     // ============================================================
     // 2️⃣ VISION: Entrada con IMAGEN
     // ============================================================
@@ -70,7 +248,6 @@ public class DeepSeekClient {
         log.warn("🟦 [DeepSeek] completando imagen/visión...");
         return ejecutarConRetry(body);
     }
-
 
 
     // ==================================================================================
@@ -134,73 +311,6 @@ public class DeepSeekClient {
         return ejecutarConRetry_sinValidar(body);
     }
 
-
-    public String completarJSON_sinValidar(Map<String, Object> inputJson) {
-
-        String jsonEntrada;
-
-        try {
-            jsonEntrada = mapper.writeValueAsString(inputJson);
-        } catch (Exception e) {
-            jsonEntrada = inputJson.toString();
-        }
-
-        String prompt = """
-                Eres un sistema experto en análisis de plantillas médicas en Word.
-                
-                Tu tarea es detectar EXCLUSIVAMENTE los CAMPOS RELLENABLES presentes en la estructura (JSON) enviada.
-                
-                Un “campo rellenable” es cualquiera de los siguientes patrones:
-                - espacios en blanco grandes
-                - líneas como: ____ , _________, ____________
-                - casilleros vacíos: (  ), (   ), [ ], [   ], { }
-                - casilleros tipo opción: “Murphy (  )”, “Mc Burney (  )”
-                - frases con huecos para completar: “Motivo de consulta: __________”
-                - tablas donde se espera que el médico escriba datos
-                - campos con líneas punteadas o espacios múltiples
-                - cualquier texto diseñado para que el médico escriba información
-                
-                NO debes devolver:
-                - secciones conceptuales (“ingreso”, “examen físico”, “diagnóstico”, etc.)
-                - campos ya llenos con texto real
-                - texto explicativo, conclusiones o interpretaciones médicas
-                - inventar campos basados en tu conocimiento clínico
-                - contenido fuera del JSON
-                
-                Tu salida DEBE SER EXACTAMENTE un JSON con este formato:
-                
-                {
-                  "nombre_campo": {
-                      "textoOriginal": "el texto exacto donde aparece el hueco",
-                      "parrafo": <indexParrafo o null>,
-                      "tabla": <indexTabla o null>,
-                      "fila": <indexFila o null>,
-                      "columna": <indexColumna o null>
-                  },
-                  ...
-                }
-                
-                Reglas adicionales:
-                - Usa nombres_campo simples y en snake_case.
-                - Si un bloque no contiene campos rellenables, devuelve {}.
-                - Si ves varios campos en una misma línea, devuélvelos como campos separados.
-                - No agregues nada fuera del JSON final.
-                - SIN Backtick Symbol
-                Ahora analiza el JSON siguiente y devuelve SOLO los campos rellenables en el formato pedido.
-        """;
-
-        // ❗ SIN response_format, DeepSeek no se "ahorca"
-        Map<String, Object> body = Map.of(
-                "model", "deepseek-chat",
-                "max_tokens", 4096,
-                "messages", List.of(
-                        Map.of("role", "user", "content", prompt + "\n\nJSON:\n" + jsonEntrada)
-                )
-        );
-
-        return ejecutarConRetry_sinValidar(body);
-    }
-
     private String ejecutarConRetry_sinValidar(Map<String, Object> body) {
 
         int intento = 1;
@@ -208,23 +318,36 @@ public class DeepSeekClient {
         while (true) {
             try {
 
+                System.out.println("➡️ ENVIANDO A DEEPSEEK:");
+                System.out.println(new ObjectMapper().writerWithDefaultPrettyPrinter().writeValueAsString(body));
+
                 String respuesta = deepSeekClient.post()
                         .uri("/chat/completions")
                         .headers(h -> h.setBearerAuth(apiKey))
                         .bodyValue(body)
                         .retrieve()
                         .bodyToMono(Map.class)
-                        .timeout(Duration.ofSeconds(150))
+                        .timeout(Duration.ofSeconds(500))
                         .map(resp -> {
+                            System.out.println("⬅️ RESPUESTA BRUTA DE DEEPSEEK:");
+                            System.out.println(resp);
+
                             var choices = (List<Map<String, Object>>) resp.get("choices");
                             var message = (Map<String, Object>) choices.get(0).get("message");
                             return message.get("content").toString();
                         })
                         .block();
 
+                System.out.println("📌 CONTENIDO DEL MESSAGE:");
+                System.out.println(respuesta);
+
                 return respuesta;
 
             } catch (Exception e) {
+
+                System.out.println("❌ ERROR EN deepSeekClient:");
+                e.printStackTrace();
+
                 if (intento >= 3) throw new RuntimeException(e);
                 intento++;
             }
@@ -286,13 +409,15 @@ public class DeepSeekClient {
                 long wait = (long) (Math.pow(2, intento) * 500L);
                 log.warn("⏳ Esperando {} ms antes del retry...", wait);
 
-                try { Thread.sleep(wait); } catch (Exception ignored) {}
+                try {
+                    Thread.sleep(wait);
+                } catch (Exception ignored) {
+                }
 
                 intento++;
             }
         }
     }
-
 
 
     // ==================================================================================

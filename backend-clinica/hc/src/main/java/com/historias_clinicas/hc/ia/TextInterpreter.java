@@ -1,8 +1,10 @@
 package com.historias_clinicas.hc.ia;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+
 import java.util.List;
 import java.util.Map;
 
@@ -15,8 +17,8 @@ public class TextInterpreter {
     private final ObjectMapper mapper = new ObjectMapper();
 
     /**
-     * Nuevo método: interpreta texto clínico y devuelve
-     * un JSON donde cada campo está COMPLETADO según su textoOriginal.
+     * Interpreta texto clínico escrito por un médico
+     * y devuelve valores para los campos de la plantilla.
      */
     public Map<String, Object> interpretarTexto(
             String texto,
@@ -28,44 +30,18 @@ public class TextInterpreter {
                 "campos", camposPlantilla
         );
 
-        String prompt = """
-                Eres un sistema experto en historias clínicas.
+        log.info("➡️ Enviando a IA: {}", payload);
 
-                Recibirás:
-                - Un texto clínico redactado por el médico.
-                - Una lista de campos, donde cada campo tiene:
-                     { "nombre": "...", "textoOriginal": "..." }
+        String raw = deepSeekClient.completarJSON_sinValidar(payload, DeepSeekClient.IA_TEXT_FILLER_PROMPT);
 
-                Tu tarea:
-                ✔ Buscar en el texto clínico los valores correspondientes.
-                ✔ REESCRIBIR el textoOriginal agregando el valor correcto.
-                ✔ Si no encuentras un valor claro, NO rellenes el campo.
+        log.info("⬅️ Respuesta IA RAW: {}", raw);
 
-                Ejemplo:
-                textoOriginal: "Edad       :"
-                texto clínico: "Paciente varón de 76 años..."
-                salida: "Edad       : 76"
-
-                Salida FINAL:
-                {
-                    "nombre_campo": "textoOriginal completado",
-                    ...
-                }
-
-                NO devuelvas explicaciones.
-                NO agregues nada fuera del JSON.
-                """;
-
-        // IA
-        String raw = deepSeekClient.completarJSON_sinValidar(payload, prompt);
-
-        // Sanitizar
         String sane = sanitize(raw);
 
         return mapper.readValue(sane, Map.class);
     }
 
-    // --- Sanitizador ---
+    // Sanitizador JSON básico
     private String sanitize(String raw) {
         if (raw == null || raw.isBlank()) return "{}";
 
@@ -74,12 +50,11 @@ public class TextInterpreter {
         int j = s.lastIndexOf("}");
 
         if (i < 0 || j <= i) {
-            log.error("❌ DeepSeek no devolvió JSON válido");
+            log.error("❌ IA no devolvió JSON válido");
             return "{}";
         }
 
         s = s.substring(i, j + 1);
-
         s = s.replaceAll("[\\u0000-\\u001F]", "");
         s = s.replaceAll(",\\s*}", "}");
         s = s.replaceAll(",\\s*]", "]");

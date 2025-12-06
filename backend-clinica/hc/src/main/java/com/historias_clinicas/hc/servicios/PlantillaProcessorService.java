@@ -15,6 +15,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.io.ByteArrayInputStream;
+import java.text.Normalizer;
 import java.util.*;
 import java.util.concurrent.*;
 
@@ -34,7 +35,6 @@ public class PlantillaProcessorService {
     // SUBIR PLANTILLA
     // ------------------------------------------------------
     public Plantilla procesarPlantilla(byte[] file, String nombre) {
-
         Plantilla plantilla = Plantilla.builder()
                 .nombre(nombre)
                 .archivoOriginal(file)
@@ -53,19 +53,17 @@ public class PlantillaProcessorService {
         Plantilla plantilla = plantillaRepo.findById(plantillaId)
                 .orElseThrow(() -> new RuntimeException("Plantilla no encontrada"));
 
-        XWPFDocument doc = new XWPFDocument(
-                new ByteArrayInputStream(plantilla.getArchivoOriginal())
-        );
+        XWPFDocument doc = new XWPFDocument(new ByteArrayInputStream(plantilla.getArchivoOriginal()));
 
         limpiarEstructuraAnterior(plantilla);
 
-        // 1. Extraer estructura compactada
+        // Paso 1: Extraer estructura física SIN procesar items
         Map<String, Object> estructura = extraerEstructuraCompacta(doc);
 
-        // 2. Interpretar por bloques en paralelo
+        // Paso 2: Interpretación IA por bloques
         Map<String, Object> interpretacion = interpretarPorBloquesParalelo(estructura);
 
-        // 3. Crear campos en BD
+        // Paso 3: Crear campos desde IA
         crearCamposDesdeIA(interpretacion, plantilla);
 
         return Map.of(
@@ -74,30 +72,40 @@ public class PlantillaProcessorService {
         );
     }
 
-    // ------------------------------------------------------
-    // EXTRAER ESTRUCTURA COMPACTA (OPTIMIZADO)
-    // ------------------------------------------------------
+
+    // =====================================================================
+    // NUEVO EXTRACTOR POI (solo texto bruto)
+    // =====================================================================
     private Map<String, Object> extraerEstructuraCompacta(XWPFDocument doc) {
 
         Map<String, Object> data = new LinkedHashMap<>();
 
+        // ------------------------------------------------------
+        // 1) PÁRRAFOS
+        // ------------------------------------------------------
         List<Map<String, Object>> parrafos = new ArrayList<>();
         int idxP = 0;
 
         for (XWPFParagraph p : doc.getParagraphs()) {
-            String texto = p.getText().trim();
-            if (texto.isEmpty()) continue; // quitar vacíos
+            String texto = p.getText();
+            if (texto != null) texto = texto.trim();
 
-            parrafos.add(Map.of(
-                    "indexParrafo", idxP,
-                    "texto", texto
-            ));
+            if (texto != null && !texto.isEmpty()) {
+                parrafos.add(Map.of(
+                        "tipo", "parrafo",
+                        "indexParrafo", idxP,
+                        "texto", texto
+                ));
+            }
             idxP++;
         }
 
         data.put("parrafos", parrafos);
 
-        // Tablas compactadas
+
+        // ------------------------------------------------------
+        // 2) TABLAS → FILAS → CELDAS
+        // ------------------------------------------------------
         List<Map<String, Object>> tablas = new ArrayList<>();
         int idxTabla = 0;
 
@@ -106,65 +114,84 @@ public class PlantillaProcessorService {
             List<Map<String, Object>> filas = new ArrayList<>();
             int idxFila = 0;
 
+            // 🔥 PRIMERA PASADA → obtener número máximo de columnas de la tabla
+            int maxCols = 0;
+            for (XWPFTableRow r : tabla.getRows()) {
+                maxCols = Math.max(maxCols, r.getTableCells().size());
+            }
+
+            // 🔥 SEGUNDA PASADA → reconstruir filas con columnas vacías
             for (XWPFTableRow row : tabla.getRows()) {
 
                 List<Map<String, Object>> celdas = new ArrayList<>();
-                int idxCelda = 0;
 
-                for (XWPFTableCell celda : row.getTableCells()) {
+                // celdas reales que POI sí detectó
+                List<XWPFTableCell> realCells = row.getTableCells();
 
-                    String texto = celda.getText();
-                    if (texto == null || texto.trim().isEmpty()) {
-                        idxCelda++;
-                        continue;
-                    }
+                for (int c = 0; c < maxCols; c++) {
 
-                    celdas.add(Map.of(
-                            "columna", idxCelda,
-                            "textoCompleto", texto,
-                            "palabras", List.of(texto.split("\\s+"))
-                    ));
+                    XWPFTableCell celda = (c < realCells.size() ? realCells.get(c) : null);
 
-                    idxCelda++;
+                    String textoCelda =
+                            (celda != null ? celda.getText() : "")
+                                    .replace("\n", "")
+                                    .trim();
+
+                    Map<String, Object> celdaMap = new LinkedHashMap<>();
+                    celdaMap.put("tipo", "celda");
+                    celdaMap.put("tabla", idxTabla);
+                    celdaMap.put("fila", idxFila);
+                    celdaMap.put("columna", c);
+                    celdaMap.put("texto", textoCelda);
+
+                    // METADATA UNIVERSAL (útil para IA)
+                    celdaMap.put("isAllCaps", textoCelda.equals(textoCelda.toUpperCase()));
+                    celdaMap.put("wordCount", textoCelda.isEmpty() ? 0 : textoCelda.split("\\s+").length);
+                    celdaMap.put("hasColon", textoCelda.contains(":"));
+                    celdaMap.put("hasParenthesis", textoCelda.contains("("));
+                    celdaMap.put("isSingleCellRow", maxCols == 1);
+                    celdaMap.put("rowCellCount", maxCols);
+
+                    celdas.add(celdaMap);
                 }
 
-                if (!celdas.isEmpty()) {
-                    filas.add(Map.of(
-                            "fila", idxFila,
-                            "celdas", celdas
-                    ));
-                }
+                filas.add(
+                        Map.of(
+                                "fila", idxFila,
+                                "celdas", celdas
+                        )
+                );
 
                 idxFila++;
             }
 
-            if (!filas.isEmpty()) {
-                tablas.add(Map.of(
-                        "tabla", idxTabla,
-                        "filas", filas
-                ));
-            }
+            tablas.add(
+                    Map.of(
+                            "tabla", idxTabla,
+                            "filas", filas
+                    )
+            );
 
             idxTabla++;
         }
 
         data.put("tablas", tablas);
-
         return data;
     }
 
-    // ------------------------------------------------------
-    // BLOQUES EN PARALELO (15k chars)
-    // ------------------------------------------------------
+
+
+    // =====================================================================
+    // INTERPRETAR POR BLOQUES (igual que antes, pero ahora con celdas simples)
+    // =====================================================================
     private Map<String, Object> interpretarPorBloquesParalelo(Map<String, Object> estructura) throws Exception {
 
         List<Map<String, Object>> statsBloques = new ArrayList<>();
-
         List<Map<String, Object>> bloques = dividirEnBloques(estructura, 8000);
 
         Map<Integer, String> respuestasParciales = new ConcurrentHashMap<>();
 
-        log.warn("🟥 Iniciando análisis en paralelo: {} bloques", bloques.size());
+        log.warn("🟥 Procesando {} bloques IA…", bloques.size());
 
         List<CompletableFuture<Void>> futures = new ArrayList<>();
         int index = 0;
@@ -172,85 +199,33 @@ public class PlantillaProcessorService {
         for (Map<String, Object> bloque : bloques) {
 
             final int bloqueId = ++index;
-            final String bloqueJson = mapper.writerWithDefaultPrettyPrinter().writeValueAsString(bloque);
-            final int chars = bloqueJson.length();
 
             CompletableFuture<Void> future =
                     CompletableFuture.runAsync(() -> {
 
-                        long inicio = System.currentTimeMillis();
-                        String thread = Thread.currentThread().getName();
-
-                        // LOG DEL BLOQUE ENVIADO
-                        log.warn("\n" +
-                                        "─────────────────────────────────────────────\n" +
-                                        "🟦 BLOQUE {} ENVIADO\n" +
-                                        "Hilo: {}\n" +
-                                        "Tamaño: {} chars\n" +
-                                        "Contenido enviado a DeepSeek:\n{}\n" +
-                                        "─────────────────────────────────────────────",
-                                bloqueId, thread, chars, bloqueJson
-                        );
-
                         try {
-                            String raw = deepSeekClient.completarJSON_sinValidar(bloque);
+                            String entrada = mapper.writerWithDefaultPrettyPrinter()
+                                    .writeValueAsString(bloque);
+
+                            long inicio = System.currentTimeMillis();
+
+                            String raw = deepSeekClient.completarJSON_sinValidar(bloque, DeepSeekClient.IA_FIELD_ANALYZER_PROMPT);
 
                             long tiempo = System.currentTimeMillis() - inicio;
 
-                            // LOG RAW RESPUESTA
-                            log.warn("\n" +
-                                            "📥 RAW RESPUESTA BLOQUE {}\n" +
-                                            "(tamaño={} chars, tiempo={} ms)\n{}\n" +
-                                            "─────────────────────────────────────────────",
-                                    bloqueId,
-                                    raw != null ? raw.length() : 0,
-                                    tiempo,
-                                    raw
-                            );
-
-                            // reparar
                             String reparado = repararMegaJSON(raw);
-
-                            // LOG JSON REPARADO
-                            log.warn("\n" +
-                                            "🔧 JSON REPARADO BLOQUE {}\n{}\n" +
-                                            "─────────────────────────────────────────────",
-                                    bloqueId,
-                                    reparado
-                            );
 
                             respuestasParciales.put(bloqueId, reparado);
 
                             statsBloques.add(Map.of(
                                     "bloqueId", bloqueId,
-                                    "chars", chars,
+                                    "chars", entrada.length(),
                                     "tiempo_ms", tiempo,
-                                    "estado", "OK",
-                                    "hilo", thread
+                                    "estado", "OK"
                             ));
 
                         } catch (Exception e) {
-
-                            long tiempo = System.currentTimeMillis() - inicio;
-
-                            log.error("\n" +
-                                            "❌ ERROR EN BLOQUE {}\n" +
-                                            "Mensaje: {}\n" +
-                                            "─────────────────────────────────────────────",
-                                    bloqueId,
-                                    e.getMessage()
-                            );
-
-                            respuestasParciales.put(bloqueId, "");
-
-                            statsBloques.add(Map.of(
-                                    "bloqueId", bloqueId,
-                                    "chars", chars,
-                                    "tiempo_ms", tiempo,
-                                    "estado", "ERROR",
-                                    "error", e.getMessage(),
-                                    "hilo", thread
-                            ));
+                            respuestasParciales.put(bloqueId, "{}");
                         }
 
                     }, iaExecutor);
@@ -260,83 +235,44 @@ public class PlantillaProcessorService {
 
         CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
 
-        log.warn("🟩 Todos los bloques finalizaron.");
-
-        // ============================================================
-        //  🟦 PROCESAR CADA BLOQUE Y PARSEAR JSON REPARADO
-        // ============================================================
         Map<String, Object> resultadoFinal = new LinkedHashMap<>();
 
         for (Integer bloqueId : respuestasParciales.keySet()) {
 
             String json = respuestasParciales.get(bloqueId);
 
-            if (json == null || json.isBlank()) continue;
-
             try {
                 Map<String, Object> parsed = mapper.readValue(json, Map.class);
                 resultadoFinal.putAll(parsed);
-
-                log.warn("\n" +
-                                "🟩 BLOQUE {} PARSEADO CORRECTAMENTE\n" +
-                                "Keys agregadas: {}\n" +
-                                "─────────────────────────────────────────────",
-                        bloqueId,
-                        parsed.keySet()
-                );
-
-            } catch (Exception e) {
-                log.error("\n" +
-                                "❌ BLOQUE {} — ERROR PARSEANDO JSON REPARADO\n" +
-                                "Error: {}\n" +
-                                "JSON:\n{}\n" +
-                                "─────────────────────────────────────────────",
-                        bloqueId,
-                        e.getMessage(),
-                        json
-                );
-            }
+            } catch (Exception ignored) {}
         }
 
         resultadoFinal.put("_statsBloques", statsBloques);
-
         return resultadoFinal;
     }
 
 
-    private String repararMegaJSON(String raw) {
 
+    // =====================================================================
+    // JSON FIXER
+    // =====================================================================
+    private String repararMegaJSON(String raw) {
         if (raw == null || raw.isBlank()) return "{}";
 
         String txt = raw.trim();
 
-        // Quitar texto basura ANTES o DESPUÉS del JSON
-        txt = txt.replaceAll("^[^{]+", "");     // basura antes de '{'
-        txt = txt.replaceAll("[^}]+$", "");     // basura después de '}'
+        txt = txt.replaceAll("^[^{]+", "");
+        txt = txt.replaceAll("[^}]+$", "");
 
-        // Asegurar que empieza en '{'
-        if (!txt.startsWith("{"))
-            txt = "{" + txt;
+        if (!txt.startsWith("{")) txt = "{" + txt;
+        if (!txt.endsWith("}")) txt = txt + "}";
 
-        // Asegurar que termina en '}'
-        if (!txt.endsWith("}"))
-            txt = txt + "}";
+        long count = txt.chars().filter(c -> c == '"').count();
+        if (count % 2 != 0) txt += "\"";
 
-        // Reparar comillas abiertas
-        long count = txt.chars().filter(ch -> ch == '"').count();
-        if (count % 2 != 0)
-            txt += "\"";
-
-        // Reparar comas colgantes
         txt = txt.replaceAll(",\\s*}", "}");
 
-        // Reparar JSON con pares "key": value sin coma
-        txt = txt.replaceAll("}(\\s*\"[^\"]+\":)", "},$1");
-
-        // Reparar llaves anidadas truncadas
-        txt = balancearLlaves(txt);
-
-        return txt;
+        return balancearLlaves(txt);
     }
 
     private String balancearLlaves(String s) {
@@ -347,146 +283,71 @@ public class PlantillaProcessorService {
             if (c == '}') close++;
         }
 
-        StringBuilder sb = new StringBuilder(s);
-        while (open > close) {
-            sb.append("}");
+        while (close < open) {
+            s += "}";
             close++;
         }
-
-        return sb.toString();
+        return s;
     }
 
 
-    // ------------------------------------------------------
-    // DIVIDIR EN BLOQUES
-    // ------------------------------------------------------
+
+    // =====================================================================
+    // DIVISOR DE BLOQUES IA (igual que antes)
+    // =====================================================================
     private List<Map<String, Object>> dividirEnBloques(Map<String, Object> estructura, int maxChars) throws Exception {
 
-        // ============================================
-        // 🔵 PARÁMETROS RECOMENDADOS
-        // ============================================
-        int LIMITE_BLOQUE = Math.min(maxChars, 8000);   // límite real para DeepSeek
-        int LIMITE_ITEM = 5000;                         // si un item es demasiado grande, lo divido
-
         List<Object> items = new ArrayList<>();
-
-        // Añadir párrafos
         items.addAll((List<?>) estructura.get("parrafos"));
 
-        // Añadir tablas, pero cada fila como un item
         List<Map<String, Object>> tablas = (List<Map<String, Object>>) estructura.get("tablas");
+
         for (Map<String, Object> tabla : tablas) {
 
-            List<Map<String, Object>> filas = (List<Map<String, Object>>) tabla.get("filas");
             int tablaId = (int) tabla.get("tabla");
 
-            for (Map<String, Object> fila : filas) {
+            for (Map<String, Object> fila : (List<Map<String, Object>>) tabla.get("filas")) {
 
-                // Clonamos la estructura de la fila, manteniendo la referencia a su tabla
-                Map<String, Object> itemFila = new LinkedHashMap<>();
-                itemFila.put("tabla", tablaId);
-                itemFila.put("fila", fila.get("fila"));
-                itemFila.put("celdas", fila.get("celdas"));
+                int filaId = (int) fila.get("fila");
 
-                items.add(itemFila);
+                Map<String, Object> filaCompacta = new LinkedHashMap<>();
+                filaCompacta.put("tabla", tablaId);
+                filaCompacta.put("fila", filaId);
+                filaCompacta.put("celdas", fila.get("celdas"));
+
+                items.add(filaCompacta);
             }
         }
 
-
-        // ============================================
-        // 🔵 ARMAR BLOQUES
-        // ============================================
         List<Map<String, Object>> bloques = new ArrayList<>();
-
-        List<Object> bloqueActual = new ArrayList<>();
+        List<Object> actual = new ArrayList<>();
         int sizeActual = 0;
 
         for (Object item : items) {
-
             String json = mapper.writeValueAsString(item);
-            int sizeItem = json.length();
+            int size = json.length();
 
-            // -----------------------------------
-            // 🔴 ITEM DEMASIADO GRANDE → DIVIDIR
-            // -----------------------------------
-            if (sizeItem > LIMITE_ITEM) {
-                // Dividir celdas de la fila en bloques pequeños
-                bloques.addAll(dividirItemGrande(item, LIMITE_BLOQUE));
-                continue;
-            }
-
-            // -----------------------------------
-            // 🟡 ¿Cabe en el bloque actual?
-            // -----------------------------------
-            if (sizeActual + sizeItem > LIMITE_BLOQUE) {
-
-                // cerrar bloque
-                bloques.add(Map.of("items", new ArrayList<>(bloqueActual)));
-
-                bloqueActual.clear();
+            if (sizeActual + size > maxChars) {
+                bloques.add(Map.of("items", new ArrayList<>(actual)));
+                actual.clear();
                 sizeActual = 0;
             }
 
-            // agregar item seguro
-            bloqueActual.add(item);
-            sizeActual += sizeItem;
+            actual.add(item);
+            sizeActual += size;
         }
 
-        // agregar último bloque
-        if (!bloqueActual.isEmpty()) {
-            bloques.add(Map.of("items", bloqueActual));
-        }
+        if (!actual.isEmpty()) bloques.add(Map.of("items", actual));
 
         return bloques;
     }
 
 
-    /**
-     * Divide un item gigante (normalmente una fila con muchas celdas o texto largo)
-     * en múltiples sub-items seguros para DeepSeek.
-     */
-    private List<Map<String, Object>> dividirItemGrande(Object item, int limitePorBloque) throws Exception {
 
-        List<Map<String, Object>> resultado = new ArrayList<>();
-
-        Map<String, Object> fila = (Map<String, Object>) item;
-
-        List<Map<String, Object>> celdas = (List<Map<String, Object>>) fila.get("celdas");
-
-        List<Object> bloqueActual = new ArrayList<>();
-        int sizeActual = 0;
-
-        for (Map<String, Object> celda : celdas) {
-
-            String json = mapper.writeValueAsString(celda);
-            int size = json.length();
-
-            if (sizeActual + size > limitePorBloque) {
-                resultado.add(Map.of("items", new ArrayList<>(bloqueActual)));
-                bloqueActual.clear();
-                sizeActual = 0;
-            }
-
-            bloqueActual.add(Map.of(
-                    "tabla", fila.get("tabla"),
-                    "fila", fila.get("fila"),
-                    "celda", celda
-            ));
-
-            sizeActual += size;
-        }
-
-        if (!bloqueActual.isEmpty()) {
-            resultado.add(Map.of("items", bloqueActual));
-        }
-
-        return resultado;
-    }
-
-    // ------------------------------------------------------
-    // CREAR CAMPOS DESDE IA
-    // ------------------------------------------------------
-    private void crearCamposDesdeIA(Map<String, Object> interpretacion, Plantilla plantilla) {
+    // =====================================================================
+    // CREAR CAMPOS DESDE IA (NUEVO MODELO)
+    // =====================================================================
+    private void crearCamposDesdeIA(Map<String, Object> ia, Plantilla plantilla) {
 
         PlantillaSeccion seccion = PlantillaSeccion.builder()
                 .nombre("SECCION_GENERAL")
@@ -495,37 +356,34 @@ public class PlantillaProcessorService {
 
         seccionRepo.save(seccion);
 
-        for (String nombre : interpretacion.keySet()) {
+        for (String key : ia.keySet()) {
 
-            // ❗ IGNORAR KEYS INTERNAS QUE NO SON CAMPOS
-            if (nombre.startsWith("_")) continue; // _statsBloques, etc
+            if (key.startsWith("_")) continue;
 
-            Object raw = interpretacion.get(nombre);
+            Map<String, Object> info = (Map<String, Object>) ia.get(key);
 
-            // ❗ El valor debe ser un MAP, si no lo ignoramos
-            if (!(raw instanceof Map)) {
+            Integer tabla = (Integer) info.get("tabla");
+            Integer fila = (Integer) info.get("fila");
+            Integer col = (Integer) info.get("columna");
+            Integer itemIndex = (Integer) info.get("itemIndex");
 
-                // Convertir cualquier cosa a MAP normalizado
-                Map<String, Object> info = new LinkedHashMap<>();
-                info.put("textoOriginal", raw != null ? raw.toString() : null);
-                info.put("parrafo", null);
-                info.put("tabla", null);
-                info.put("fila", null);
-                info.put("columna", null);
+            String textoOriginal = (String) info.get("textoOriginal");
+            String tipo = (String) info.get("tipo");
+            String descripcion = (String) info.get("descripcion");
 
-                raw = info;
-            }
-
-            Map<String, Object> info = (Map<String, Object>) raw;
+            String nombreCampoFinal = generarNombreCampo(textoOriginal, tabla, fila, col, itemIndex);
 
             PlantillaCampo campo = PlantillaCampo.builder()
                     .seccion(seccion)
-                    .nombreCampo(nombre)
-                    .textoOriginal((String) info.get("textoOriginal"))
-                    .indexParrafo((Integer) info.get("parrafo"))
-                    .indexTabla((Integer) info.get("tabla"))
-                    .indexFila((Integer) info.get("fila"))
-                    .indexCelda((Integer) info.get("columna"))
+                    .nombreCampo(nombreCampoFinal)
+                    .textoOriginal(textoOriginal)
+                    .tipoCampo(tipo)
+                    .descripcionCampo(descripcion)
+                    .indexTabla(tabla)
+                    .indexFila(fila)
+                    .indexCelda(col)
+                    .itemIndex(itemIndex)
+                    .indexParrafo(null)
                     .build();
 
             campoRepo.save(campo);
@@ -533,9 +391,33 @@ public class PlantillaProcessorService {
     }
 
 
-    // ------------------------------------------------------
-    // LIMPIAR CAMPOS ANTERIORES
-    // ------------------------------------------------------
+    private String generarNombreCampo(String textoOriginal, int tabla, int fila, int col, int itemIndex) {
+
+        if (textoOriginal == null) textoOriginal = "campo";
+
+        String t = textoOriginal;
+
+        t = t.replace("( )", "").replace("()", "").trim();
+
+        t = Normalizer.normalize(t, Normalizer.Form.NFD)
+                .replaceAll("\\p{M}", "");
+
+        t = t.toLowerCase()
+                .replaceAll("[^a-z0-9]+", "_")
+                .replaceAll("_+", "_")
+                .replaceAll("^_|_$", "");
+
+        return t +
+                "_t" + tabla +
+                "_f" + fila +
+                "_c" + col +
+                "_i" + itemIndex;
+    }
+
+
+    // =====================================================================
+    // LIMPIAR BD
+    // =====================================================================
     private void limpiarEstructuraAnterior(Plantilla plantilla) {
 
         List<PlantillaSeccion> secs = seccionRepo.findByPlantillaId(plantilla.getId());

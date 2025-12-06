@@ -37,11 +37,15 @@ public class PlantillaCampo {
      * POSICIÓN EXACTA EN EL WORD
      * Permite volver al párrafo exacto y reemplazar runs.
      */
+
+    private String descripcionCampo;
+
     private Integer indexParrafo;
 
     private Integer indexRunInicio;
 
     private Integer indexRunFin;
+    private Integer itemIndex;
 
     /** Si está dentro de tabla */
     private Integer indexTabla;      // null si está fuera

@@ -52,42 +52,42 @@ public class HCIAController {
 
             Long plantillaId = version.getHistoriaClinica().getPlantilla().getId();
 
-            // 1. OBTENER TODOS LOS CAMPOS DETECTADOS POR /analizar
+            // 1️⃣ TRAER TODOS LOS CAMPOS DE LA PLANTILLA
             List<PlantillaCampo> campos = campoRepo.findBySeccion_Plantilla_Id(plantillaId);
 
-            // 2. CONSTRUIR LA LISTA QUE LA IA NECESITA
+            // 2️⃣ ARMAR TODOS LOS DATOS NECESARIOS PARA IA
             List<Map<String,Object>> camposPlantilla = campos.stream()
                     .map(c -> {
-                        Map<String,Object> m = new HashMap<>();
-                        m.put("nombre", c.getNombreCampo());
-                        m.put("textoOriginal", c.getTextoOriginal());
-                        m.put("tabla", c.getIndexTabla());
-                        m.put("fila", c.getIndexFila());
-                        m.put("columna", c.getIndexCelda());
-                        m.put("parrafo", c.getIndexParrafo());
+                        Map<String,Object> m = new LinkedHashMap<>();
+                        m.put("nombre", c.getNombreCampo());            // ✔ obligatorio
+                        m.put("textoOriginal", c.getTextoOriginal());  // ✔ evita deducciones
+                        m.put("tipo", c.getTipoCampo());               // ✔ clave para interpretar
+                        m.put("descripcion", c.getDescripcionCampo()); // ✔ IA sabe qué extraer
                         return m;
                     })
                     .toList();
 
+            // 3️⃣ IA INTERPRETA EL TEXTO
+            Map<String,Object> jsonIA = textInterpreter.interpretarTexto(texto, camposPlantilla);
 
-            // 3. IA interpreta texto usando ESTA LISTA (campo → textoOriginal completado)
-            Map<String,Object> jsonIA = textInterpreter.interpretarTexto(
-                    texto,
-                    camposPlantilla
-            );
-
-            // 4. LISTA bonita para el front (con IDs)
+            // 4️⃣ ARMAR LISTA PARA EL FRONT
             List<Map<String,Object>> lista = campos.stream()
-                    .map(c -> Map.of(
-                            "campoId", c.getId(),
-                            "nombre", c.getNombreCampo(),
-                            "valor", jsonIA.getOrDefault(c.getNombreCampo(), c.getTextoOriginal())
-                    ))
+                    .map(c -> {
+                        Map<String,Object> m = new LinkedHashMap<>();
+                        m.put("campoId", c.getId());
+                        m.put("nombre", c.getNombreCampo());
+                        m.put("valor", jsonIA.get(c.getNombreCampo())); // ✔ puede ser null
+                        return m;
+                    })
                     .toList();
 
-            // 5. JSON EXACTO que /confirmar necesita
+            // 5️⃣ JSON PARA CONFIRMAR — SOLO LOS QUE TIENEN VALOR
             Map<String,String> jsonConfirmar = new LinkedHashMap<>();
-            jsonIA.forEach((k,v) -> jsonConfirmar.put(k, v.toString()));
+            jsonIA.forEach((k,v) -> {
+                if (v != null && !v.toString().isBlank()) {
+                    jsonConfirmar.put(k, v.toString());
+                }
+            });
 
             return ResponseEntity.ok(Map.of(
                     "mensaje", "Previsualización generada desde texto",
