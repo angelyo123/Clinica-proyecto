@@ -5,7 +5,10 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;
 
-public interface PlantillaSeccionRepository extends JpaRepository<PlantillaSeccion, Long>
-{
+public interface PlantillaSeccionRepository
+        extends JpaRepository<PlantillaSeccion, Long> {
+
     List<PlantillaSeccion> findByPlantillaId(Long plantillaId);
+
+    void deleteByPlantillaId(Long plantillaId);
 }

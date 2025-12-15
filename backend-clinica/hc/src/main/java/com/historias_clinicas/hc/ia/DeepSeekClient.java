@@ -11,6 +11,8 @@ import org.springframework.web.client.RestTemplate;
 import org.springframework.web.reactive.function.client.WebClient;
 
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -30,22 +32,230 @@ public class DeepSeekClient {
     // ==============================
     // 🔵  CONFIG
     // ==============================
-    private static final Duration TIMEOUT = Duration.ofSeconds(180);
+    private static final Duration TIMEOUT = Duration.ofSeconds(360);
     private static final int MAX_RETRIES = 3;
 
 
     // ============================================================
-    // 1️⃣ COMPLETAR TEXTO (prompt simple)
+// 🧩 CONCILIACIÓN POR BLOQUES (REEMPLAZA completar())
+// ============================================================
+    public List<Map<String, Object>> conciliarEstructuraPorBloques(
+            Map<String, Object> estructuraPOI,
+            Map<String, Object> vision
+    ) {
+
+        log.info("🧠 [DeepSeek] Conciliación iniciada (Vision → POI)");
+
+        String raw = conciliarEstructura(estructuraPOI, vision);
+        String limpio = limpiarJSON(raw);
+
+        try {
+            List<Map<String, Object>> acciones =
+                    mapper.readValue(limpio, List.class);
+
+            log.info("🏁 Conciliación finalizada: {} acciones", acciones.size());
+            return acciones;
+
+        } catch (Exception e) {
+            throw new RuntimeException("Error parseando acciones conciliadas", e);
+        }
+    }
+
+    private String limpiarJSON(String raw) {
+
+        if (raw == null || raw.isBlank()) return "[]";
+
+        String txt = raw.trim()
+                .replaceAll("```json", "")
+                .replaceAll("```", "")
+                .replaceAll("^[^\\[{]+", "")
+                .replaceAll("[^\\]}]+$", "");
+
+        if (!txt.startsWith("[") && !txt.startsWith("{")) {
+            txt = "[" + txt + "]";
+        }
+
+        return txt;
+    }
+
+
+
     // ============================================================
-    public String completar(String prompt) {
+// 🧩 CONCILIAR UNA SOLA REGIÓN VISUAL (ANTI-TRUNCAMIENTO)
+// ============================================================
+    public List<Map<String, Object>> conciliarRegion(
+            Map<String, Object> estructuraPOI,
+            Map<String, Object> region
+    ) {
 
-        Map<String, Object> body = Map.of(
-                "model", "deepseek-chat",
-                "messages", List.of(Map.of("role", "user", "content", prompt))
-        );
+        log.info("🧠 [DeepSeek] Conciliando región: {}",
+                region.getOrDefault("hint_text", "sin_hint"));
 
-        log.warn("🟦 [DeepSeek] completando prompt simple...");
-        return ejecutarConRetry(body);
+        try {
+
+            String regionJson = mapper
+                    .writerWithDefaultPrettyPrinter()
+                    .writeValueAsString(region);
+
+            String poiJson = mapper
+                    .writerWithDefaultPrettyPrinter()
+                    .writeValueAsString(estructuraPOI);
+
+            String prompt = construirPromptConciliadorPorRegion(
+                    regionJson,
+                    poiJson
+            );
+
+            Map<String, Object> body = Map.of(
+                    "model", "deepseek-chat",
+                    "max_tokens", 8192, // 👈 más que suficiente por región
+                    "messages", List.of(
+                            Map.of("role", "user", "content", prompt)
+                    )
+            );
+
+            String raw = ejecutarConRetry(body);
+            String limpio = limpiarJSON(raw);
+
+            // 🔒 Protección dura contra JSON truncado
+            if (!limpio.trim().endsWith("]")) {
+                throw new IllegalStateException(
+                        "JSON truncado al conciliar región: " +
+                                region.getOrDefault("hint_text", "?")
+                );
+            }
+
+            List<Map<String, Object>> acciones =
+                    mapper.readValue(limpio, List.class);
+
+            log.info("✅ Región '{}' conciliada: {} acciones",
+                    region.getOrDefault("hint_text", "?"),
+                    acciones.size());
+
+            return acciones;
+
+        } catch (Exception e) {
+            throw new RuntimeException(
+                    "Error conciliando región: " +
+                            region.getOrDefault("hint_text", "?"),
+                    e
+            );
+        }
+    }
+
+    // ============================================================
+// 🔹 CONCILIAR UN SOLO BLOQUE (BASE DE TODO)
+// ============================================================
+    private String conciliarEstructura(
+            Map<String, Object> estructuraPOI,
+            Map<String, Object> vision
+    ) {
+
+        try {
+            String visionJson = mapper
+                    .writerWithDefaultPrettyPrinter()
+                    .writeValueAsString(vision.get("regiones"));
+
+            String poiJson = mapper
+                    .writerWithDefaultPrettyPrinter()
+                    .writeValueAsString(estructuraPOI);
+
+            String prompt = construirPromptConciliador(
+                    visionJson,
+                    poiJson
+            );
+
+            Map<String, Object> body = Map.of(
+                    "model", "deepseek-chat",
+                    "max_tokens", 8192,
+                    "messages", List.of(
+                            Map.of("role", "user", "content", prompt)
+                    )
+            );
+
+            return ejecutarConRetry(body);
+
+        } catch (Exception e) {
+            throw new RuntimeException("Error construyendo prompt conciliador", e);
+        }
+    }
+
+
+    private String construirPromptConciliadorPorRegion(
+            String regionJson,
+            String estructuraPoiJson
+    ) {
+
+        return """
+Eres un sistema conciliador entre UNA REGIÓN VISUAL
+y la estructura física de un documento extraída mediante POI.
+
+La región visual es la ÚNICA fuente de decisión.
+La estructura POI es SOLO un mapa para localizar posiciones reales.
+
+============================================================
+📕 REGIÓN VISUAL A PROCESAR
+============================================================
+
+Esta solicitud corresponde EXCLUSIVAMENTE
+a la siguiente región visual.
+
+NO debes procesar otras regiones.
+NO debes crear instrucciones nuevas.
+
+REGION_JSON:
+%s
+
+============================================================
+📘 ESTRUCTURA FÍSICA DEL DOCUMENTO (POI)
+============================================================
+
+Contiene tablas, filas y celdas con texto real
+y posiciones físicas.
+
+Úsalo SOLO para localizar las celdas
+descritas por la región visual.
+
+POI_JSON:
+%s
+
+============================================================
+🚫 REGLAS ABSOLUTAS
+============================================================
+
+- Procesa EXCLUSIVAMENTE esta región.
+- El campo "accion" debe devolverse EXACTAMENTE
+  con el valor recibido en la región.
+- NO inventes acciones.
+- NO cambies el tipo de acción.
+- NO inventes texto clínico.
+- NO incluyas celdas no descritas por la región.
+
+============================================================
+🎯 TU TAREA
+============================================================
+
+1) Lee la acción indicada en la región.
+2) Usa la descripción estructural para localizar
+   la celda o conjunto de celdas correspondientes en POI.
+3) Genera UNA o MÁS acciones con coordenadas reales.
+
+============================================================
+📦 FORMATO DE SALIDA
+============================================================
+
+Devuelve EXCLUSIVAMENTE un JSON con una LISTA de acciones.
+
+Cada acción debe incluir:
+- tabla
+- fila
+- columna (o columna inicial si aplica)
+- textoOriginal
+- accion (EXACTAMENTE igual a la región)
+- descripcion
+
+NO agregues texto fuera del JSON.
+""".formatted(regionJson, estructuraPoiJson);
     }
 
 
@@ -128,102 +338,83 @@ Si ningún campo puede completarse, devuelve "{}".
 
 """;
 
-    public static final String IA_FIELD_ANALYZER_PROMPT = """
+    private String construirPromptConciliador(
+            String visionJson,
+            String estructuraPoiJson
+    ) {
 
-Eres un analizador universal de formularios clínicos.
+        return """
+Eres un sistema conciliador entre un ANÁLISIS VISUAL YA REALIZADO
+y la estructura física de un documento extraída mediante POI.
 
-Recibes un JSON con tablas, filas, celdas y texto.
+El análisis visual (VISION) es la ÚNICA fuente de decisiones.
+La estructura POI es SOLO un mapa para localizar posiciones reales.
 
-Tu única tarea es identificar los ELEMENTOS cuya función dentro del formulario
-es PEDIR un dato, una respuesta o una selección por parte del médico.
+============================================================
+📕 ÓRDENES VISUALES (VISION)
+============================================================
 
-A eso lo llamamos “campo rellenable”.
+Este objeto contiene TODAS las instrucciones que debes ejecutar.
+NO debes crear instrucciones nuevas.
+NO debes modificar ni reinterpretar las instrucciones existentes.
 
-=====================================================================
-🔵 CRITERIO UNIVERSAL (basado en función, no en contenido)
-=====================================================================
+VISION_JSON:
+%s
 
-Un elemento es un campo rellenable SI Y SOLO SI su propósito es que el médico:
+============================================================
+📘 ESTRUCTURA FÍSICA DEL DOCUMENTO (POI)
+============================================================
 
-1) Escriba un valor,
-2) Marque una opción, o
-3) Seleccione presencia/ausencia de un hallazgo.
+Este objeto contiene tablas, filas y celdas con texto real
+y posiciones físicas.
 
-Este criterio depende únicamente de la función del elemento dentro de la estructura
-del formulario, no de palabras específicas, formatos, idioma o estilo visual.
+Debes usarlo ÚNICAMENTE para localizar coordenadas reales
+indicadas por las órdenes visuales.
 
-=====================================================================
-🔵 MANEJO UNIVERSAL DE TABLAS (sin heurísticas)
-=====================================================================
+POI_JSON:
+%s
 
-Cuando una tabla presenta:
+============================================================
+🚫 REGLAS ABSOLUTAS
+============================================================
 
-- una fila con varias celdas que contienen texto (actúan como etiquetas),
-- y las filas inmediatamente debajo contienen celdas VACÍAS en esas mismas columnas,
+- Procesa EXCLUSIVAMENTE las órdenes contenidas en VISION_JSON.
+- El campo "accion" debe devolverse EXACTAMENTE
+  con el mismo valor recibido en Vision.
+- NO inventes acciones.
+- NO cambies el tipo de acción.
+- NO inventes texto clínico.
+- NO analices POI si no existe una orden visual asociada.
 
-ENTONCES toda celda vacía en esas columnas representa un CAMPO RELLENABLE.
+============================================================
+🎯 TU TAREA
+============================================================
 
-La celda superior proporciona la etiqueta del campo.
-La primera celda con texto en la fila actual (si existe) funciona como modificador
-(opciones como “Derecho”, “Izquierdo”, “Día 1”, “Resultado”, etc.).
+Para CADA orden visual:
 
-Esto es una regla estructural universal aplicable a cualquier formulario clínico.
+1) Lee la acción indicada en Vision.
+2) Usa la descripción para localizar en POI
+   la celda o conjunto de celdas correspondientes.
+3) Genera UNA o MÁS acciones con coordenadas reales.
 
-=====================================================================
-🔵 OTROS CASOS DE CAMPOS RELLENABLES
-=====================================================================
+============================================================
+📦 FORMATO DE SALIDA
+============================================================
 
-Se consideran también campos:
+Devuelve EXCLUSIVAMENTE un JSON con una LISTA de acciones.
 
-- Textos que terminan en ":" porque solicitan ingresar un valor.
-- Textos que contienen "( )" u otros indicadores de selección.
-- Etiquetas acompañadas de espacio vacío dentro de la misma fila o celda.
-- Listas de opciones seleccionables típicas de exámenes clínicos.
-- Celdas vacías cuya función en el formulario es recibir un dato.
+Cada acción debe incluir:
+- tabla
+- fila
+- columna (o columna inicial si abarca varias)
+- textoOriginal
+- accion (EXACTAMENTE igual a Vision)
+- descripcion
 
-=====================================================================
-🔴 NO son campos rellenable
-=====================================================================
+NO agregues texto fuera del JSON.
+""".formatted(visionJson, estructuraPoiJson);
+    }
 
-Descarta (NO son campos):
-
-- Títulos o encabezados generales.
-- Textos narrativos ya completos que no esperan respuesta.
-- Descripciones que informan pero no solicitan llenado.
-- Cualquier componente cuyo propósito no sea pedir un dato.
-
-IMPORTANTE:
-No decidas por estilo, mayúsculas, número de palabras, color, tamaño, decoración,
-ni por su contenido literal. Decide SOLO por su función dentro del formulario.
-
-=====================================================================
-📦 SALIDA
-=====================================================================
-
-Devuelve exclusivamente un JSON con la estructura:
-
-{
-  "nombre_campo": {
-    "textoOriginal": "...",
-    "tabla": <int>,
-    "fila": <int>,
-    "columna": <int>,
-    "itemIndex": <int>,
-    "tipo": "texto | checkbox | ros_item | celda_llenable",
-    "descripcion": "qué se debe llenar aquí"
-  }
-}
-
-- No incluyas texto fuera del JSON.
-- Usa itemIndex comenzando desde 0, incrementando si hay múltiples elementos dentro
-  de la misma celda o fila.
-- La descripción debe explicar brevemente qué información debe ir en ese campo.
-
-Todas tus decisiones deben basarse únicamente en la función del elemento:
-si el formulario espera que el médico ponga un dato → es un campo.
-Si no espera nada → no es un campo.
-
-""";
 
 
 
@@ -250,37 +441,42 @@ Si no espera nada → no es un campo.
     }
 
 
-    // ==================================================================================
-    // 3️⃣ JSON MODE — Entrada gigante (bloques de estructura médica)
-    // ==================================================================================
-    public String completarJSON(String prompt, Map<String, Object> inputJson) {
+    private List<Map<String, Object>> dividirEnBloques(
+            Map<String, Object> estructuraPOI,
+            Map<String, Object> vision,
+            int maxChars
+    ) {
 
-        String jsonEntrada;
-        try {
-            jsonEntrada = mapper.writerWithDefaultPrettyPrinter().writeValueAsString(inputJson);
-        } catch (Exception e) {
-            jsonEntrada = inputJson.toString();
+        List<Map<String, Object>> bloques = new ArrayList<>();
+
+        List<Map<String, Object>> tablas =
+                (List<Map<String, Object>>) estructuraPOI.get("tablas");
+
+        List<Map<String, Object>> regiones =
+                (List<Map<String, Object>>) vision.getOrDefault("regiones", List.of());
+
+        for (Map<String, Object> tabla : tablas) {
+
+            Map<String, Object> bloque = new LinkedHashMap<>();
+            bloque.put("tabla", tabla);
+            bloque.put("vision", regiones);
+
+            int size;
+            try {
+                size = mapper.writeValueAsString(bloque).length();
+            } catch (Exception e) {
+                size = Integer.MAX_VALUE;
+            }
+
+            if (size <= maxChars) {
+                bloques.add(bloque);
+            } else {
+                // fallback ultra seguro: tabla sola
+                bloques.add(Map.of("tabla", tabla));
+            }
         }
 
-        log.warn("🟧 [DeepSeek] completando JSON gigante...");
-        log.warn("📦 Tamaño del JSON de entrada: {} chars", jsonEntrada.length());
-
-        String finalPrompt =
-                prompt +
-                        "\n\nIMPORTANTE: Devuelve SOLO JSON válido.\n" +
-                        "NO expliques nada. NO agregues texto fuera del JSON.\n\n" +
-                        "JSON de entrada:\n" +
-                        jsonEntrada;
-
-        Map<String, Object> body = Map.of(
-                "model", "deepseek-chat",
-                // Desactivar modo JSON duro — NO soporta prompts grandes
-// "response_format": null
-                "max_tokens", 4096,
-                "messages", List.of(Map.of("role", "user", "content", finalPrompt))
-        );
-
-        return ejecutarConRetry(body);
+        return bloques;
     }
 
 
@@ -296,7 +492,7 @@ Si no espera nada → no es un campo.
 
         Map<String, Object> body = Map.of(
                 "model", "deepseek-chat",
-                "max_tokens", 4096,
+                "max_tokens", 8192,
                 "messages", List.of(
                         Map.of(
                                 "role", "user",
@@ -364,12 +560,15 @@ Si no espera nada → no es un campo.
         int intento = 1;
 
         while (true) {
+
+            String respuesta = null; // 👈 CLAVE
+
             try {
                 log.warn("🔄 [DeepSeek] Intento {}/{}", intento, MAX_RETRIES);
 
                 long inicio = System.currentTimeMillis();
 
-                String respuesta = deepSeekClient.post()
+                respuesta = deepSeekClient.post()
                         .uri("/chat/completions")
                         .headers(h -> h.setBearerAuth(apiKey))
                         .contentType(MediaType.APPLICATION_JSON)
@@ -386,24 +585,30 @@ Si no espera nada → no es un campo.
 
                 long ms = System.currentTimeMillis() - inicio;
 
-                log.warn("🟩 [DeepSeek] Respuesta completa en {} ms", ms);
-                log.warn("📥 RAW (primeros 600 chars):\n{}",
-                        respuesta != null && respuesta.length() > 600
-                                ? respuesta.substring(0, 600)
-                                : respuesta);
+                log.warn("🟩 [DeepSeek] Respuesta recibida en {} ms ({} chars)",
+                        ms,
+                        respuesta != null ? respuesta.length() : 0);
 
-                // Validar JSON (si es modo JSON)
-                validarJSON(respuesta);
+                if (log.isDebugEnabled()) {
+                    log.debug("📥 [DeepSeek] RAW COMPLETO:\n{}", respuesta);
+                }
+
+                String limpio = limpiarJSON(respuesta);
+                validarJSON(limpio);
 
                 return respuesta;
 
             } catch (Exception e) {
 
-                log.error("❌ [DeepSeek] Error: {}", e.getMessage());
+                log.error("❌ [DeepSeek] Error en intento {}: {}", intento, e.getMessage());
+
+                if (log.isDebugEnabled() && respuesta != null) {
+                    log.debug("🧨 [DeepSeek] RAW FALLIDO:\n{}", respuesta);
+                }
 
                 if (intento >= MAX_RETRIES) {
                     log.error("⛔ [DeepSeek] Reintentos agotados!");
-                    throw new RuntimeException("DeepSeek falló: " + e.getMessage(), e);
+                    throw new RuntimeException("DeepSeek falló", e);
                 }
 
                 long wait = (long) (Math.pow(2, intento) * 500L);
@@ -411,8 +616,7 @@ Si no espera nada → no es un campo.
 
                 try {
                     Thread.sleep(wait);
-                } catch (Exception ignored) {
-                }
+                } catch (InterruptedException ignored) {}
 
                 intento++;
             }
@@ -425,18 +629,17 @@ Si no espera nada → no es un campo.
     // ==================================================================================
     private void validarJSON(String contenido) throws Exception {
 
-        if (contenido == null) {
+        if (contenido == null || contenido.isBlank()) {
             throw new RuntimeException("Respuesta nula de DeepSeek.");
         }
 
         contenido = contenido.trim();
 
-        if (!contenido.startsWith("{") || !contenido.endsWith("}")) {
-            log.warn("⚠ JSON inválido o truncado detectado:\n{}", contenido);
-            throw new RuntimeException("DeepSeek devolvió JSON inválido o incompleto.");
+        if (!(contenido.startsWith("{") || contenido.startsWith("["))) {
+            throw new RuntimeException("JSON inválido");
         }
 
-        // Parseo real para validar
         mapper.readTree(contenido);
     }
+
 }

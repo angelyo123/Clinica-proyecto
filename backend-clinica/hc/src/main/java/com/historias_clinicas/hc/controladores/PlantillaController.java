@@ -1,14 +1,12 @@
 package com.historias_clinicas.hc.controladores;
 
 import com.historias_clinicas.hc.entidades.Plantilla;
-import com.historias_clinicas.hc.servicios.PlantillaExtractorService;
 import com.historias_clinicas.hc.servicios.PlantillaProcessorService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -19,8 +17,6 @@ import java.util.Map;
 public class PlantillaController {
 
     private final PlantillaProcessorService plantillaProcessorService;
-    private final PlantillaExtractorService plantillaExtractorService;
-
     // ---------------------------------------------------------------
     // SUBIR PLANTILLA
     // ---------------------------------------------------------------
@@ -44,75 +40,26 @@ public class PlantillaController {
     @PostMapping("/{plantillaId}/analizar")
     public ResponseEntity<?> analizarPlantilla(@PathVariable Long plantillaId) {
 
-        long inicioTotal = System.currentTimeMillis();
+        long inicio = System.currentTimeMillis();
 
         try {
-            // Ejecutar análisis
-            Map<String, Object> resultado = plantillaProcessorService.analizarPlantilla(plantillaId);
 
-            long totalMs = System.currentTimeMillis() - inicioTotal;
+            Map<String, Object> resultado =
+                    plantillaProcessorService.analizarPlantilla(plantillaId);
 
-            // ============================================================
-            // 🟦 Extraer estadísticas generadas por el servicio
-            // ============================================================
-            Map<String, Object> estructuraIA = (Map<String, Object>) resultado.get("estructuraIA");
-
-            List<Map<String, Object>> statsBloques =
-                    estructuraIA.containsKey("_statsBloques")
-                            ? (List<Map<String, Object>>) estructuraIA.get("_statsBloques")
-                            : List.of();
-
-            if (estructuraIA == null) {
-                estructuraIA = Map.of(); // mapa vacío
-            }
-
-            int totalCampos = estructuraIA.size() - statsBloques.size(); // sin _statsBloques
-
-            // ============================================================
-            // 🟦 Respuesta Clean + Métricas
-            // ============================================================
-
-
-            Map<String, Object> body = new LinkedHashMap<>();
-            body.put("mensaje", "Plantilla analizada correctamente");
-            body.put("duracion_ms", totalMs);
-            body.put("bloquesProcesados", statsBloques.size());
-            body.put("camposDetectados", totalCampos);
-            body.put("bloques", statsBloques);
-            body.put("data", resultado);
-
-
-            return ResponseEntity.ok(body);
+            return ResponseEntity.ok(Map.of(
+                    "mensaje", "Plantilla analizada correctamente",
+                    "duracion_ms", System.currentTimeMillis() - inicio,
+                    "data", resultado
+            ));
 
         } catch (Exception e) {
-            e.printStackTrace();  // ⬅️ LOG REAL
 
-            Map<String, Object> error = new LinkedHashMap<>();
-            error.put("error", e.getMessage() != null ? e.getMessage() : "Error desconocido");
-            error.put("detalle", e.toString());           // <-- AQUI MANDAMOS LA EXCEPCIÓN REAL
-            error.put("causa", e.getCause() != null ? e.getCause().toString() : null);
-
-            return ResponseEntity.internalServerError().body(error);
-
+            return ResponseEntity.internalServerError().body(Map.of(
+                    "error", e.getMessage(),
+                    "detalle", e.toString()
+            ));
         }
-    }
-
-
-    // ---------------------------------------------------------------
-    // EXTRAER PLANTILLA DESDE WORD LLENO
-    // ---------------------------------------------------------------
-    @PostMapping(
-            value = "/extraer",
-            produces = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-    )
-    public ResponseEntity<byte[]> extraer(@RequestParam MultipartFile file) throws Exception {
-
-        byte[] plantilla = plantillaExtractorService.generarPlantillaDesdeWord(file.getBytes());
-
-        return ResponseEntity.ok()
-                .header("Content-Type", "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
-                .header("Content-Disposition", "attachment; filename=plantilla_generada.docx")
-                .body(plantilla);
     }
 
 }
