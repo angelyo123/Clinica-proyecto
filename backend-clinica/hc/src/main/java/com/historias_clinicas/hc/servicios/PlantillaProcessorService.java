@@ -23,11 +23,14 @@ import org.apache.commons.codec.digest.DigestUtils;
 
 import java.io.ByteArrayInputStream;
 import java.util.*;
+import java.util.concurrent.ExecutorService;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class PlantillaProcessorService {
+
+    private final ExecutorService iaExecutor;
 
     private final PlantillaRepository plantillaRepo;
     private final PlantillaSeccionRepository seccionRepo;

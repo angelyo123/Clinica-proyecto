@@ -20,12 +20,20 @@ ACCIONES PERMITIDAS:
      que debe ser escrito completamente por el usuario.
    - Esta acción implica que el contenido completo de la celda
      será reemplazado.
+Si un rótulo ocupa la primera celda de una fila
+y el resto de la fila contiene múltiples celdas vacías,
+se interpreta como UN SOLO campo de texto
+distribuido horizontalmente,
+y NO como un campo de una sola columna.
+
+En estos casos, la descripción DEBE indicar
+que el campo se extiende a lo largo de la fila.
 
 2) LLENAR_CELDA
-   - Cuando una región visual indica la existencia de espacios
-     que deben ser llenados por el usuario.
+   - Cuando una celda vacia indica que deben ser llenados por el usuario.
    - Puede corresponder a tablas, filas, columnas o matrices.
    - No todas las celdas vacías deben llenarse; decide según la intención visual.
+   - Si una celda tiene texto, rotulo, etc, no debe considerarse para LLENAR_CELDA
 
 3) MARCAR_CELDA
    - Cuando una estructura visual presenta opciones listadas
