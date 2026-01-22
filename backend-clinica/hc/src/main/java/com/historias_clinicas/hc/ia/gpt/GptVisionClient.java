@@ -130,6 +130,9 @@ public class GptVisionClient {
 
         if (content == null) return List.of();
 
+        // =============================
+        // CASO 1: GPT devuelve texto JSON
+        // =============================
         if (content instanceof String texto) {
 
             String limpio = texto
@@ -139,10 +142,38 @@ public class GptVisionClient {
 
             if (limpio.isBlank()) return List.of();
 
-            return mapper.readValue(limpio, List.class);
+            // ⬅️ PARSEAR SIEMPRE COMO MAP, NO COMO LIST
+            Map<String, Object> root =
+                    mapper.readValue(limpio, Map.class);
+
+            Object regionesRaw =
+                    root.getOrDefault(
+                            "regiones",
+                            root.get("regiones_editables")
+                    );
+
+            return normalizarRegiones(regionesRaw);
         }
 
-        // Caso raro: Vision devuelve estructura directa
+        // =============================
+        // CASO 2: GPT devuelve estructura directa
+        // =============================
+        if (content instanceof Map<?, ?> rawMap) {
+
+            @SuppressWarnings("unchecked")
+            Map<String, Object> map = (Map<String, Object>) rawMap;
+
+            Object regionesRaw =
+                    map.containsKey("regiones")
+                            ? map.get("regiones")
+                            : map.get("regiones_editables");
+
+            return normalizarRegiones(regionesRaw);
+        }
+
+        // =============================
+        // CASO 3: GPT devuelve lista directa (raro, pero válido)
+        // =============================
         if (content instanceof List<?>) {
             return (List<Map<String, Object>>) content;
         }
@@ -151,4 +182,21 @@ public class GptVisionClient {
                 "Formato inesperado en content Vision: " + content.getClass()
         );
     }
+
+    private List<Map<String, Object>> normalizarRegiones(Object regionesRaw) {
+
+        if (regionesRaw == null) return List.of();
+
+        List<Map<String, Object>> regiones = new ArrayList<>();
+
+        if (regionesRaw instanceof List<?> lista) {
+            regiones.addAll((List<Map<String, Object>>) lista);
+        }
+        else if (regionesRaw instanceof Map<?, ?> map) {
+            regiones.add((Map<String, Object>) map);
+        }
+
+        return regiones;
+    }
+
 }

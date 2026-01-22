@@ -1,16 +1,14 @@
 package com.historias_clinicas.hc.servicios;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.historias_clinicas.hc.entidades.Plantilla;
-import com.historias_clinicas.hc.entidades.PlantillaAccion;
-import com.historias_clinicas.hc.entidades.PlantillaSeccion;
-import com.historias_clinicas.hc.entidades.TipoAccion;
+import com.historias_clinicas.hc.entidades.*;
 import com.historias_clinicas.hc.ia.DeepSeekClient;
 import com.historias_clinicas.hc.ia.VisionPrompts;
 import com.historias_clinicas.hc.ia.gpt.GptVisionClient;
 import com.historias_clinicas.hc.repositorios.PlantillaAccionRepo;
 import com.historias_clinicas.hc.repositorios.PlantillaRepository;
 import com.historias_clinicas.hc.repositorios.PlantillaSeccionRepository;
+import com.historias_clinicas.hc.repositorios.PlantillaVisionRepo;
 import com.historias_clinicas.hc.servicios.word.PdfToPngService;
 import com.historias_clinicas.hc.servicios.word.WordToPdfService;
 import lombok.RequiredArgsConstructor;
@@ -22,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.apache.commons.codec.digest.DigestUtils;
 
 import java.io.ByteArrayInputStream;
+import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
 
@@ -39,6 +38,7 @@ public class PlantillaProcessorService {
     private final PlantillaAccionRepo plantillaAccionRepo;
     private final WordToPdfService wordToPdfService;
     private final PdfToPngService pdfToPngService;
+    private final PlantillaVisionRepo plantillaVisionRepo;
     private final ObjectMapper mapper = new ObjectMapper();
 
     // ============================================================
@@ -139,12 +139,19 @@ public class PlantillaProcessorService {
                             "Analiza esta página de la historia clínica."
                     );
 
-            List<Map<String, Object>> regionesPagina =
-                    (List<Map<String, Object>>) visionPagina.getOrDefault(
-                            "regiones", List.of()
-                    );
+            Object regionesRaw = visionPagina.get("regiones");
+
+            List<Map<String, Object>> regionesPagina = new ArrayList<>();
+
+            if (regionesRaw instanceof List<?> lista) {
+                regionesPagina.addAll((List<Map<String, Object>>) lista);
+            }
+            else if (regionesRaw instanceof Map<?, ?> map) {
+                regionesPagina.add((Map<String, Object>) map);
+            }
 
             regionesTotales.addAll(regionesPagina);
+
         }
 
 // 🔁 Deduplicación estructural segura
@@ -152,15 +159,27 @@ public class PlantillaProcessorService {
         List<Map<String, Object>> regionesUnicas = new ArrayList<>();
 
         for (Map<String, Object> r : regionesTotales) {
-            String firma = r.get("hint_text") + "|" + r.get("accion") + "|" + r.get("descripcion");
+            String firma =
+                    r.get("ancla_visual") + "|" +
+                            r.get("tipo_region");
             if (firmas.add(firma)) {
                 regionesUnicas.add(r);
             }
         }
 
         Map<String, Object> vision = Map.of(
-                "regiones", regionesUnicas
+                "regiones_editables", regionesUnicas
         );
+
+        PlantillaVision pv = new PlantillaVision(
+                null,
+                plantilla,
+                vision, // Map<String,Object>
+                hashEstructura,
+                LocalDateTime.now()
+        );
+
+        plantillaVisionRepo.save(pv);
 
         log.info("👁️ Vision detectó {} regiones ({} tras deduplicar)",
                 regionesTotales.size(),
@@ -180,30 +199,12 @@ public class PlantillaProcessorService {
             String hint = (String) region.get("hint_text");
             log.info("🧠 Conciliando región visual: {}", hint);
 
-            List<Map<String, Object>> accionesRegion =
-                    deepSeekClient.conciliarRegion(
-                            estructuraPOI,
-                            region
-                    );
-
-            log.info("✅ Región '{}' conciliada: {} acciones",
-                    hint,
-                    accionesRegion.size());
-
-            accionesTotales.addAll(accionesRegion);
         }
-
-        guardarAccionesComoPlantilla(
-                accionesTotales,
-                plantilla,
-                hashEstructura
-        );
 
 
         return Map.of(
                 "estructuraPOI", estructuraPOI,
-                "vision", vision,
-                "acciones", accionesTotales
+                "vision", vision
         );
     }
 
@@ -216,13 +217,17 @@ public class PlantillaProcessorService {
         for (Map<String, Object> a : acciones) {
 
 
-            String accionRaw = ((String) a.get("accion")).trim().toUpperCase();
+            String tipoRegionRaw =
+                    ((String) a.get("tipo_region"))
+                            .trim()
+                            .toUpperCase();
 
-            if (!EnumUtils.isValidEnum(TipoAccion.class, accionRaw)) {
+            if (!EnumUtils.isValidEnum(TipoRegion.class, tipoRegionRaw)) {
                 throw new IllegalStateException(
-                        "Acción inválida devuelta por IA: " + accionRaw
+                        "Tipo de región inválido: " + tipoRegionRaw
                 );
             }
+
             PlantillaAccion accion = PlantillaAccion.builder()
                     .plantilla(plantilla)
                     .indexTabla((Integer) a.get("tabla"))
@@ -323,6 +328,30 @@ public class PlantillaProcessorService {
         if (!txt.endsWith("}")) txt += "}";
 
         return txt;
+    }
+
+    // ============================================================
+// SOLO POI – ESTRUCTURA CRUDA (DEBUG / INSPECCIÓN)
+// ============================================================
+    @Transactional(readOnly = true)
+    public Map<String, Object> extraerEstructuraPoi(Long plantillaId) throws Exception {
+
+        log.info("🔍 Extrayendo estructura POI para plantilla {}", plantillaId);
+
+        Plantilla plantilla = plantillaRepo.findById(plantillaId)
+                .orElseThrow(() -> new RuntimeException("Plantilla no encontrada"));
+
+        XWPFDocument doc = new XWPFDocument(
+                new ByteArrayInputStream(plantilla.getArchivoOriginal())
+        );
+
+        Map<String, Object> estructura = extraerEstructuraCompacta(doc);
+
+        return Map.of(
+                "origen", "POI",
+                "plantillaId", plantillaId,
+                "estructura", estructura
+        );
     }
 
     // ============================================================

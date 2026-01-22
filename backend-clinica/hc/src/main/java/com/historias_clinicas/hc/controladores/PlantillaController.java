@@ -61,5 +61,30 @@ public class PlantillaController {
             ));
         }
     }
+    // ---------------------------------------------------------------
+// VER ESTRUCTURA POI (DEBUG)
+// ---------------------------------------------------------------
+    @GetMapping("/{plantillaId}/poi")
+    public ResponseEntity<?> verEstructuraPoi(@PathVariable Long plantillaId) {
+
+        try {
+
+            Map<String, Object> data =
+                    plantillaProcessorService.extraerEstructuraPoi(plantillaId);
+
+            return ResponseEntity.ok(Map.of(
+                    "mensaje", "Estructura POI extraída correctamente",
+                    "data", data
+            ));
+
+        } catch (Exception e) {
+
+            return ResponseEntity.internalServerError().body(Map.of(
+                    "error", e.getMessage(),
+                    "detalle", e.toString()
+            ));
+        }
+    }
+
 
 }
