@@ -4,7 +4,7 @@ import lombok.Data;
 
 @Data
 public class CampoValorConfirmado {
-    private Long campoId;
+
     private String valor;
     private String nombre; // opcional, pero útil para debug
 

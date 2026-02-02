@@ -1,6 +1,8 @@
 package com.historias_clinicas.hc.controladores;
 
+import com.historias_clinicas.hc.dto.CampoValorConfirmado;
 import com.historias_clinicas.hc.entidades.HistoriaClinicaVersion;
+import com.historias_clinicas.hc.entidades.PlantillaAccion;
 import com.historias_clinicas.hc.entidades.PlantillaCampo;
 import com.historias_clinicas.hc.generadores.PdfGenerator;
 import com.historias_clinicas.hc.ia.IaService;
@@ -8,6 +10,7 @@ import com.historias_clinicas.hc.ia.ImageInterpreter;
 import com.historias_clinicas.hc.ia.MappingEngine;
 import com.historias_clinicas.hc.ia.TextInterpreter;
 import com.historias_clinicas.hc.repositorios.CampoValorRepository;
+import com.historias_clinicas.hc.repositorios.PlantillaAccionRepo;
 import com.historias_clinicas.hc.repositorios.PlantillaCampoRepository;
 import com.historias_clinicas.hc.servicios.DocumentoService;
 
@@ -33,6 +36,7 @@ public class HCIAController {
     private final HistoriaClinicaVersionRepository versionRepo;
     private final DocumentoService documentoService;
     private final PlantillaCampoRepository campoRepo;
+    private final PlantillaAccionRepo plantillaAccionRepo;
     private final IaService iaService;
     private final PdfGenerator pdfGenerator;
     private final PlantillaProcessorService plantillaProcessorService;
@@ -53,33 +57,25 @@ public class HCIAController {
             Long plantillaId = version.getHistoriaClinica().getPlantilla().getId();
 
             // 1️⃣ TRAER TODOS LOS CAMPOS DE LA PLANTILLA
-            List<PlantillaCampo> campos = campoRepo.findBySeccion_Plantilla_Id(plantillaId);
+            List<PlantillaAccion> acciones =
+                    plantillaAccionRepo.findByPlantillaId(plantillaId);
 
             // 2️⃣ ARMAR TODOS LOS DATOS NECESARIOS PARA IA
-            List<Map<String,Object>> camposPlantilla = campos.stream()
-                    .map(c -> {
+            List<Map<String,Object>> camposPlantilla = acciones.stream()
+                    .map(a -> {
                         Map<String,Object> m = new LinkedHashMap<>();
-                        m.put("nombre", c.getNombreCampo());            // ✔ obligatorio
-                        m.put("textoOriginal", c.getTextoOriginal());  // ✔ evita deducciones
-                        m.put("tipo", c.getTipoCampo());               // ✔ clave para interpretar
-                        m.put("descripcion", c.getDescripcionCampo()); // ✔ IA sabe qué extraer
+                        m.put("id", a.getId());                     // 🔑 clave
+                        m.put("textoOriginal", a.getTextoOriginal());
+                        m.put("descripcion", a.getDescripcion());
+                        m.put("tabla", a.getIndexTabla());
+                        m.put("fila", a.getIndexFila());
+                        m.put("columna", a.getIndexColumna());
                         return m;
                     })
                     .toList();
 
             // 3️⃣ IA INTERPRETA EL TEXTO
             Map<String,Object> jsonIA = textInterpreter.interpretarTexto(texto, camposPlantilla);
-
-            // 4️⃣ ARMAR LISTA PARA EL FRONT
-            List<Map<String,Object>> lista = campos.stream()
-                    .map(c -> {
-                        Map<String,Object> m = new LinkedHashMap<>();
-                        m.put("campoId", c.getId());
-                        m.put("nombre", c.getNombreCampo());
-                        m.put("valor", jsonIA.get(c.getNombreCampo())); // ✔ puede ser null
-                        return m;
-                    })
-                    .toList();
 
             // 5️⃣ JSON PARA CONFIRMAR — SOLO LOS QUE TIENEN VALOR
             Map<String,String> jsonConfirmar = new LinkedHashMap<>();
@@ -92,7 +88,6 @@ public class HCIAController {
             return ResponseEntity.ok(Map.of(
                     "mensaje", "Previsualización generada desde texto",
                     "data", Map.of(
-                            "lista", lista,
                             "jsonConfirmar", jsonConfirmar
                     )
             ));
@@ -198,10 +193,10 @@ public class HCIAController {
             var version = versionRepo.findById(versionId)
                     .orElseThrow(() -> new RuntimeException("Versión no encontrada"));
 
-            Map<PlantillaCampo, String> valoresIA =
-                    documentoService.guardarValores(version, valoresPlano);
+            List<CampoValorConfirmado> valores =
+                    documentoService.guardarValoresAcciones(version, valoresPlano);
 
-            byte[] word = documentoService.generarWord(version, valoresIA);
+            byte[] word = documentoService.generarWord(version, valores);
 
             return ResponseEntity.ok()
                     .header("Content-Type",

@@ -14,89 +14,50 @@ import java.util.*;
 @RequiredArgsConstructor
 public class PlantillaFillService {
 
-    private final AiRenderService ai;
-    private final WordRenderEngine word;
-
     public byte[] llenarWord(
             byte[] plantillaBytes,
-            List<CampoValorConfirmado> valores,
-            List<PlantillaCampo> campos
+            List<CampoValorConfirmado> valores
     ) throws Exception {
 
-        XWPFDocument doc = new XWPFDocument(new ByteArrayInputStream(plantillaBytes));
-
-        // Agrupar por celda
-        Map<String, List<CampoValorConfirmado>> mapa = new LinkedHashMap<>();
+        XWPFDocument doc = new XWPFDocument(
+                new ByteArrayInputStream(plantillaBytes)
+        );
 
         for (CampoValorConfirmado v : valores) {
-            PlantillaCampo c = buscar(v.getCampoId(), campos);
-            if (c == null) continue;
 
-            mapa.computeIfAbsent(keyCelda(c), k -> new ArrayList<>()).add(v);
-        }
+            // ===============================
+            // CASO 1: CELDA DE TABLA
+            // ===============================
+            if (v.getIndexTabla() != null &&
+                    v.getIndexFila()  != null &&
+                    v.getIndexCelda() != null) {
 
-        // Procesar cada celda
-        for (String key : mapa.keySet()) {
+                XWPFTable tabla = doc.getTableArray(v.getIndexTabla());
+                if (tabla == null) continue;
 
-            List<CampoValorConfirmado> listaValores = mapa.get(key);
-            PlantillaCampo ref = buscar(listaValores.get(0).getCampoId(), campos);
+                XWPFTableRow fila = tabla.getRow(v.getIndexFila());
+                if (fila == null) continue;
 
-            // Obtener la celda real del Word
-            XWPFTableCell celda = doc.getTableArray(ref.getIndexTabla())
-                    .getRow(ref.getIndexFila())
-                    .getCell(ref.getIndexCelda());
+                XWPFTableCell celda = fila.getCell(v.getIndexCelda());
+                if (celda == null) continue;
 
-            if (celda == null) continue;
-
-            String textoCeldaReal = extraerTextoCelda(celda);
-
-            // Obtener todos los campos pertenecientes a esta celda
-            List<PlantillaCampo> listaCampos = campos.stream()
-                    .filter(c ->
-                            Objects.equals(c.getIndexTabla(), ref.getIndexTabla()) &&
-                                    Objects.equals(c.getIndexFila(), ref.getIndexFila()) &&
-                                    Objects.equals(c.getIndexCelda(), ref.getIndexCelda())
-                    )
-                    .sorted(Comparator.comparing(PlantillaCampo::getItemIndex))
-                    .toList();
-
-            List<Map<String, Object>> items = new ArrayList<>();
-
-            for (PlantillaCampo c : listaCampos) {
-
-                String valor = listaValores.stream()
-                        .filter(v -> v.getCampoId().equals(c.getId()))
-                        .map(CampoValorConfirmado::getValor)
-                        .findFirst()
-                        .orElse(null);
-
-                Map<String, Object> it = new LinkedHashMap<>();
-                it.put("descripcion", c.getDescripcionCampo());
-                it.put("tipo", c.getTipoCampo());
-                it.put("valor", valor);
-                it.put("itemIndex", c.getItemIndex());
-
-                items.add(it);
+                limpiarCelda(celda);
+                escribirCelda(celda, v.getValor());
             }
 
-            // Si es una celda_llenable simple (como PULSOS), aplicar shortcut:
-            if (items.size() == 1 && "celda_llenable".equals(items.get(0).get("tipo"))) {
+            // ===============================
+            // CASO 2: PÁRRAFO
+            // ===============================
+            else if (v.getIndexParrafo() != null) {
 
-                String valor = (String) items.get(0).get("valor");
+                XWPFParagraph p = doc.getParagraphArray(v.getIndexParrafo());
+                if (p == null) continue;
 
-                Map<String, Object> instruccionDirecta = new HashMap<>();
-                instruccionDirecta.put("strategy", "texto_plano");
-                instruccionDirecta.put("textoFinal", valor != null ? valor : "");
-
-                word.escribirCeldaCompleta(celda, instruccionDirecta);
-                continue; // ← evitar IA
+                p.getRuns().clear();
+                p.createRun().setText(
+                        v.getValor() != null ? v.getValor() : ""
+                );
             }
-
-            // → Llamar IA
-            Map<String, Object> instruccion = ai.generarInstruccionCelda(textoCeldaReal, items);
-
-            // → Escribir en Word
-            word.escribirCeldaCompleta(celda, instruccion);
         }
 
         ByteArrayOutputStream out = new ByteArrayOutputStream();
@@ -104,20 +65,17 @@ public class PlantillaFillService {
         return out.toByteArray();
     }
 
-
-    private String extraerTextoCelda(XWPFTableCell celda) {
-        StringBuilder sb = new StringBuilder();
-        for (XWPFParagraph p : celda.getParagraphs()) {
-            sb.append(p.getText()).append(" ");
-        }
-        return sb.toString().trim();
+    // ===============================
+    // HELPERS
+    // ===============================
+    private void limpiarCelda(XWPFTableCell cell) {
+        cell.removeParagraph(0);
+        cell.addParagraph().createRun().setText("");
     }
 
-    private PlantillaCampo buscar(Long id, List<PlantillaCampo> lista) {
-        return lista.stream().filter(c -> c.getId().equals(id)).findFirst().orElse(null);
-    }
-
-    private String keyCelda(PlantillaCampo c) {
-        return c.getIndexTabla() + "-" + c.getIndexFila() + "-" + c.getIndexCelda();
+    private void escribirCelda(XWPFTableCell cell, String texto) {
+        cell.removeParagraph(0);
+        cell.addParagraph().createRun()
+                .setText(texto != null ? texto : "");
     }
 }

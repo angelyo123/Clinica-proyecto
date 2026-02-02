@@ -32,7 +32,7 @@ public class DeepSeekClient {
     // ==============================
     // 🔵  CONFIG
     // ==============================
-    private static final Duration TIMEOUT = Duration.ofSeconds(360);
+    private static final Duration TIMEOUT = Duration.ofMinutes(30);
     private static final int MAX_RETRIES = 3;
 
 
@@ -102,7 +102,7 @@ public class DeepSeekClient {
                     .writeValueAsString(estructuraPOI);
 
             String prompt = construirPromptConciliadorPorRegion(
-                    regionJson,
+                    mapper.writeValueAsString(region.get("regiones_editables")),
                     poiJson
             );
 
@@ -118,11 +118,8 @@ public class DeepSeekClient {
             String limpio = limpiarJSON(raw);
 
             // 🔒 Protección dura contra JSON truncado
-            if (!limpio.trim().endsWith("]")) {
-                throw new IllegalStateException(
-                        "JSON truncado al conciliar región: " +
-                                region.getOrDefault("hint_text", "?")
-                );
+            if (limpio == null || limpio.isBlank()) {
+                return List.of();
             }
 
             List<Map<String, Object>> acciones =
@@ -182,161 +179,247 @@ public class DeepSeekClient {
 
 
     private String construirPromptConciliadorPorRegion(
-            String regionJson,
+            String visionJson,
             String estructuraPoiJson
     ) {
 
         return """
-Eres un sistema conciliador entre UNA REGIÓN VISUAL
-y la estructura física de un documento extraída mediante POI.
+Eres un sistema analizador de estructura documental.
 
-La región visual es la ÚNICA fuente de decisión.
-La estructura POI es SOLO un mapa para localizar posiciones reales.
+La estructura POI contiene tablas, filas y celdas con texto literal.
+- y/o párrafos independientes con texto literal.
+Debes analizarla COMPLETAMENTE.
+
+IGNORA cualquier concepto de región visual.
+IGNORA tablas como entidades clínicas.
+NO interpretes el contenido médico.
+
 
 ============================================================
-📕 REGIÓN VISUAL A PROCESAR
+🧠 CONTEXTO VISUAL (AYUDA, NO ORDEN)
 ============================================================
 
-Esta solicitud corresponde EXCLUSIVAMENTE
-a la siguiente región visual.
+El siguiente JSON proviene de un análisis VISUAL del documento.
 
-NO debes procesar otras regiones.
-NO debes crear instrucciones nuevas.
+IMPORTANTE:
+- Este análisis visual NO contiene acciones.
+- NO es obligatorio seguirlo.
+- NO reemplaza la estructura POI.
+- NO debes generar acciones nuevas basándote solo en visión.
 
-REGION_JSON:
+SU FUNCIÓN ES:
+- ayudarte a entender la INTENCIÓN VISUAL del documento
+- identificar límites naturales de edición
+- evitar dividir o unir campos incorrectamente
+- reconocer bloques que visualmente se editan como unidad
+- reconocer tablas cuya intención es marcable vs informativa
+
+VISION_JSON (ayuda semántica):
 %s
 
 ============================================================
 📘 ESTRUCTURA FÍSICA DEL DOCUMENTO (POI)
 ============================================================
 
-Contiene tablas, filas y celdas con texto real
-y posiciones físicas.
-
-Úsalo SOLO para localizar las celdas
-descritas por la región visual.
-
 POI_JSON:
 %s
 
 ============================================================
-🚫 REGLAS ABSOLUTAS
+📌 REGLAS ABSOLUTAS DE DETECCIÓN
 ============================================================
 
-- Procesa EXCLUSIVAMENTE esta región.
-- El campo "accion" debe devolverse EXACTAMENTE
-  con el valor recibido en la región.
-- NO inventes acciones.
-- NO cambies el tipo de acción.
-- NO inventes texto clínico.
-- NO incluyas celdas no descritas por la región.
+- Analiza TODAS las filas del documento.
+- Una fila es CANDIDATA si contiene al menos un carácter ":".
+- La unidad editable NO es solo la fila.
+- La unidad editable es la COMBINACIÓN FILA–COLUMNA.
 
 ============================================================
-🎯 TU TAREA
+📌 REGLA CLAVE FILA–COLUMNA
 ============================================================
 
-1) Lee la acción indicada en la región.
-2) Usa la descripción estructural para localizar
-   la celda o conjunto de celdas correspondientes en POI.
-3) Genera UNA o MÁS acciones con coordenadas reales.
+- Si una fila contiene múltiples rótulos editables
+  ubicados en DIFERENTES columnas,
+  CADA combinación fila–columna es un CAMPO INDEPENDIENTE.
+
+- Si una fila tiene texto editable en UNA SOLA columna
+  y las demás columnas contienen otros rótulos
+  que NO deben ser sobrescritos,
+  debes devolver SOLO la columna editable.
+
+- NUNCA devuelvas una fila completa
+  si eso implicaría borrar texto de columnas adyacentes.
+
+- SOLO si una fila tiene contenido editable
+  y NO existen otros rótulos relevantes en columnas vecinas,
+  puedes devolver la fila completa (columna = null).
 
 ============================================================
-📦 FORMATO DE SALIDA
+📌 TEXTO ORIGINAL (OBLIGATORIO)
 ============================================================
 
-Devuelve EXCLUSIVAMENTE un JSON con una LISTA de acciones.
+Para cada campo devuelto:
 
-Cada acción debe incluir:
-- tabla
-- fila
-- columna (o columna inicial si aplica)
-- textoOriginal
-- accion (EXACTAMENTE igual a la región)
-- descripcion
+- Incluye el campo "textoOriginal".
+- "textoOriginal" debe contener:
+  - el texto EXACTO de la celda correspondiente
+    a esa combinación fila–columna.
+- NO concatenes otras columnas
+  si el campo es específico de una columna.
+- NO reescribas ni resumas el texto.
 
-NO agregues texto fuera del JSON.
-""".formatted(regionJson, estructuraPoiJson);
+                ============================================================
+                📌 REGLAS PARA PÁRRAFOS
+                ============================================================
+                
+                - Un párrafo es una UNIDAD EDITABLE si:
+                  - contiene un carácter ":"\s
+                  - o representa claramente un rótulo seguido de un espacio editable.
+                
+                - Si el contenido editable pertenece a un PÁRRAFO:
+                  - NO existe columna.
+                  - NO existe celda.
+                  - La acción debe ser sobre el párrafo completo.
+                
+                - En ese caso:
+                  - usa el campo "fila" como indexParrafo
+                  - establece "tabla" = null
+                  - establece "columna" = null
+                  - el tipo de acción debe ser "EDITAR_PARRAFO"
+                
+============================================================
+📌 DESCRIPCIÓN DE EDICIÓN
+============================================================
+
+
+- La descripción DEBE identificar el campo de forma inequívoca
+  dentro del documento, utilizando su CONTEXTO ESTRUCTURAL.
+
+- Incluye siempre referencias como:
+  - el bloque o sección del documento donde aparece el texto
+  - el rol del campo dentro de la tabla o párrafo
+  - su relación con otros rótulos visibles en la misma fila o columnas adyacentes
+
+- NO utilices descripciones genéricas reutilizables.
+- NO asumas que existe un único campo de ese tipo en el documento.
+- La descripción debe permitir distinguir este campo
+  de otros campos similares ubicados en otras tablas o secciones.
+  
+- Incluye el campo "descripcion".
+- Describe CÓMO debe editarse ese campo puntual.
+- Indica si:
+  - se reemplaza el texto después del ":"
+  - se completa un valor faltante
+  - se mantiene el rótulo y solo cambia el contenido
+- NO incluyas valores clínicos.
+- NO interpretes información médica.
+- La descripción debe permitir
+  que otra IA edite el Word SIN deformar el formato.
+
+============================================================
+📦 FORMATO DE SALIDA (OBLIGATORIO)
+============================================================
+
+Devuelve EXCLUSIVAMENTE un JSON con una LISTA de objetos.
+
+Cada objeto debe incluir EXACTAMENTE:
+
+- tabla            (int)
+- fila             (int)
+- columna          (int | null)
+- textoOriginal    (string)
+- accion           ("EDITAR_CAMPO" | "EDITAR_PARRAFO")
+- descripcion      (string)
+
+- Si la acción es "EDITAR_PARRAFO":
+  - "tabla" debe ser null
+  - "columna" debe ser null
+  - "fila" representa el indexParrafo
+  
+============================================================
+🚫 PROHIBIDO
+============================================================
+
+- NO devuelvas filas completas por defecto.
+- NO devuelvas columnas sin fila.
+- NO devuelvas celdas sin contexto fila–columna.
+- NO agregues texto fuera del JSON.
+""".formatted(visionJson, estructuraPoiJson);
     }
 
 
     public static final String IA_TEXT_FILLER_PROMPT = """
 
-Eres un sistema experto en interpretación de texto clínico.
+Eres un sistema reescritor de campos documentales clínicos.
 
 RECIBES:
-- Un texto clínico libre escrito por un médico.
-- Una lista de campos extraídos desde una plantilla. Cada campo contiene:
-  {
-    "nombre": "...",
-    "textoOriginal": "...",
-    "tipo": "texto | checkbox | ros_item | celda_llenable",
-    "descripcion": "qué información representa este campo"
-  }
+1) Un TEXTO CLÍNICO libre escrito por un médico.
+2) Una lista de CAMPOS extraídos desde una plantilla.
+
+Cada campo contiene:
+{
+  "id": number,              // identificador único e inmutable
+  "textoOriginal": string,   // texto actual del documento (puede contener solo rótulo o estar incompleto)
+  "descripcion": string      // qué información representa este campo
+}
 
 TU TAREA:
-Interpretar el texto clínico y determinar si en él aparece información relevante
-para cada campo, basándote exclusivamente en la DESCRIPCIÓN del campo y en su TIPO.
+Determinar si el TEXTO CLÍNICO contiene información relevante
+para ese campo, basándote EXCLUSIVAMENTE en la DESCRIPCIÓN.
 
 =====================================================================
-🔵 REGLAS GENERALES
+📌 REGLA ABSOLUTA DE REESCRITURA
 =====================================================================
 
-1) No uses patrones estáticos ni dependas del formato del documento.
-2) No inventes información que el texto clínico no contenga.
-3) No infieras valores implícitos: si no está claro, no completes el campo.
-4) No agregues explicaciones, texto adicional ni etiquetas: solo valores puros.
+- Si NO hay información relevante → NO devuelvas el campo.
+- Si SÍ hay información relevante:
+
+  → genera el TEXTO FINAL COMPLETO
+    tal como debe quedar en el documento,
+    usando el textoOriginal como base estructural
+    y reemplazando completamente el contenido editable
+    por la nueva información.
+
+- El texto devuelto REEMPLAZA ÍNTEGRAMENTE
+  el contenido actual del campo.
+
+NO concatenes fragmentos.
+NO devuelvas valores parciales.
+NO respetes valores clínicos anteriores.
+NO indiques cómo editar: devuelve el resultado final.
 
 =====================================================================
-🔵 COMPORTAMIENTO POR TIPO DE CAMPO
+🚫 PROHIBIDO
 =====================================================================
 
-1) tipo = "texto"
-   → Extrae únicamente el contenido que el médico escribió relacionado
-     con la descripción del campo.
-   → Devuelve solo el valor, sin etiquetas ni frases completas.
-   → Si no hay una información claramente expresada → NO devuelvas valor.
-
-2) tipo = "checkbox"
-   → Si el texto clínico afirma el hallazgo descrito → "marcado".
-   → Si el texto clínico niega el hallazgo descrito → "no".
-   → Si el texto no menciona nada → NO devuelvas valor.
-
-3) tipo = "ros_item"
-   → Interpreta como un ítem que puede estar presente o ausente.
-   → Si el texto menciona explícitamente el síntoma/hallazgo → "marcado".
-   → Si el texto lo niega de manera clara → "no".
-   → Si no hay mención → NO devuelvas valor.
-
-4) tipo = "celda_llenable"
-   → Extrae el valor que el médico escribió relacionado con la descripción.
-   → Si no hay un valor explícito → NO devuelvas valor.
-
-=====================================================================
-🔴 PROHIBIDO
-=====================================================================
-
-- Para campos de tipo "texto": No devolver frases completas. Solo el valor puntual (ej: "anictéricas", "rosadas").
-- Para campos de tipo "checkbox" y "ros_item": No generar texto adicional.
-- ❗ Para campos de tipo "celda_llenable": SÍ está permitido devolver valores compuestos o frases clínicas completas si representan el estado del hallazgo (ej: "presente y de buena amplitud (++).").
-- No inventar datos clínicos.
-- No inferir valores no expresados.
-- No agregar explicaciones adicionales.
+- No inventar datos.
+- No inferir información no escrita explícitamente.
+- No devolver frases genéricas.
+- No explicar nada.
+- No devolver campos sin información clara.
 
 =====================================================================
 📦 FORMATO DE SALIDA
 =====================================================================
+Devuelve EXCLUSIVAMENTE un JSON.
 
-Devuelve exclusivamente un JSON:
+Cada clave DEBE ser el identificador "id" EXACTO del campo recibido
+en el JSON de entrada.
 
-{
-  "nombre_campo_1": "valor",
-  "nombre_campo_2": "valor",
-  ...
-}
+Cada valor DEBE ser el TEXTO FINAL COMPLETO que reemplazará
+íntegramente el contenido actual de ese campo en el documento.
 
-Si ningún campo puede completarse, devuelve "{}".
+REGLAS ESTRICTAS:
+- Usa EXCLUSIVAMENTE el campo "id" como clave del JSON de salida.
+- NO uses "textoOriginal" como clave.
+- NO uses la descripción como clave.
+- NO inventes identificadores.
+- NO devuelvas campos que no tengan información clara en el texto clínico.
+- Si ningún campo aplica, devuelve un objeto JSON vacío: {}.
+- NO agregues ningún texto fuera del JSON.
+
 
 """;
+
 
     private String construirPromptConciliador(
             String visionJson,
@@ -550,6 +633,34 @@ NO agregues texto fuera del JSON.
         }
     }
 
+    private String extraerContenidoDeepSeek(Map<String, Object> resp) {
+        if (resp == null) {
+            throw new RuntimeException("DeepSeek devolvió null (resp)");
+        }
+
+        Object choicesObj = resp.get("choices");
+        if (!(choicesObj instanceof List<?> choices) || choices.isEmpty()) {
+            // aquí suelen venir respuestas tipo {"error":{...}} o similares
+            throw new RuntimeException("DeepSeek sin 'choices'. Resp=" + resp);
+        }
+
+        Object choice0 = choices.get(0);
+        if (!(choice0 instanceof Map<?, ?> c0)) {
+            throw new RuntimeException("DeepSeek choices[0] no es Map. Resp=" + resp);
+        }
+
+        Object messageObj = c0.get("message");
+        if (!(messageObj instanceof Map<?, ?> msg)) {
+            throw new RuntimeException("DeepSeek sin 'message'. Resp=" + resp);
+        }
+
+        Object contentObj = msg.get("content");
+        if (contentObj == null) {
+            throw new RuntimeException("DeepSeek sin 'content'. Resp=" + resp);
+        }
+
+        return contentObj.toString();
+    }
 
 
     // ==================================================================================
@@ -574,13 +685,15 @@ NO agregues texto fuera del JSON.
                         .contentType(MediaType.APPLICATION_JSON)
                         .bodyValue(body)
                         .retrieve()
+                        .onStatus(
+                                status -> status.is4xxClientError() || status.is5xxServerError(),
+                                resp -> resp.bodyToMono(String.class)
+                                        .defaultIfEmpty("")
+                                        .map(b -> new RuntimeException("DeepSeek HTTP " + resp.statusCode() + " body=" + b))
+                        )
                         .bodyToMono(Map.class)
                         .timeout(TIMEOUT)
-                        .map(resp -> {
-                            var choices = (List<Map<String, Object>>) resp.get("choices");
-                            var message = (Map<String, Object>) choices.get(0).get("message");
-                            return message.get("content").toString();
-                        })
+                        .map(this::extraerContenidoDeepSeek)
                         .block();
 
                 long ms = System.currentTimeMillis() - inicio;

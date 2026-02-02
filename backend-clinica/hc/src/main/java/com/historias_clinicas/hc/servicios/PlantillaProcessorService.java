@@ -39,6 +39,8 @@ public class PlantillaProcessorService {
     private final WordToPdfService wordToPdfService;
     private final PdfToPngService pdfToPngService;
     private final PlantillaVisionRepo plantillaVisionRepo;
+    private final ExecutorService iaExecutor;
+
     private final ObjectMapper mapper = new ObjectMapper();
 
     // ============================================================
@@ -86,128 +88,339 @@ public class PlantillaProcessorService {
     // ============================================================
 // ANALIZAR PLANTILLA (POI + GPT-4o + DeepSeek)
 // ============================================================
-    @Transactional
-    public Map<String, Object> analizarPlantilla(Long plantillaId) throws Exception {
+//    @Transactional
+//    public Map<String, Object> analizarPlantilla(Long plantillaId) throws Exception {
+//
+//        long inicio = System.currentTimeMillis();
+//        log.info("🧠 Iniciando análisis de plantilla {}", plantillaId);
+//
+//        Plantilla plantilla = plantillaRepo.findById(plantillaId)
+//                .orElseThrow(() -> new RuntimeException("Plantilla no encontrada"));
+//
+//        String hashEstructura = DigestUtils.sha256Hex(
+//                plantilla.getArchivoOriginal()
+//        );
+//
+//        // ♻️ SI YA EXISTE ANÁLISIS → NO REANALIZAR
+//        if (plantillaAccionRepo.existsByPlantillaId(plantillaId)) {
+//            log.info("♻️ Plantilla {} ya analizada, reutilizando análisis", plantillaId);
+//            return cargarAnalisisDesdeBD(plantilla);
+//        }
+//
+//        XWPFDocument doc = new XWPFDocument(
+//                new ByteArrayInputStream(plantilla.getArchivoOriginal())
+//        );
+//
+//        limpiarEstructuraAnterior(plantilla);
+//
+//        // 1️⃣ POI
+//        log.info("📄 Extrayendo estructura POI…");
+//        Map<String, Object> estructuraPOI = extraerEstructuraCompacta(doc);
+//
+//        List<?> tablas = (List<?>) estructuraPOI.getOrDefault("tablas", List.of());
+//        log.info("📐 POI listo: {} tablas", tablas.size());
+//
+//        // 2️⃣ Word → PNG → GPT-4o Vision
+//        log.info("🖼️ Convirtiendo Word a PNG para análisis visual…");
+//
+//        byte[] pdf = wordToPdfService.convertirWordAPdf(
+//                plantilla.getArchivoOriginal()
+//        );
+//
+//        List<byte[]> pngs = pdfToPngService.convertirTodasLasPaginasAPng(pdf);
+//        List<Map<String, Object>> regionesTotales = new ArrayList<>();
+//
+//        for (int i = 0; i < pngs.size(); i++) {
+//
+//            String base64 = Base64.getEncoder().encodeToString(pngs.get(i));
+//
+//            Map<String, Object> visionPagina =
+//                    gptVisionClient.analizarImagen(
+//                            base64,
+//                            VisionPrompts.ANALISIS_VISUAL,
+//                            "Analiza esta página de la historia clínica."
+//                    );
+//
+//            Object regionesRaw = visionPagina.get("regiones");
+//
+//            List<Map<String, Object>> regionesPagina = new ArrayList<>();
+//
+//            if (regionesRaw instanceof List<?> lista) {
+//                regionesPagina.addAll((List<Map<String, Object>>) lista);
+//            }
+//            else if (regionesRaw instanceof Map<?, ?> map) {
+//                regionesPagina.add((Map<String, Object>) map);
+//            }
+//
+//            regionesTotales.addAll(regionesPagina);
+//
+//        }
+//
+//// 🔁 Deduplicación estructural segura
+//        Set<String> firmas = new HashSet<>();
+//        List<Map<String, Object>> regionesUnicas = new ArrayList<>();
+//
+//        for (Map<String, Object> r : regionesTotales) {
+//            String firma =
+//                    r.get("ancla_visual") + "|" +
+//                            r.get("tipo_region");
+//            if (firmas.add(firma)) {
+//                regionesUnicas.add(r);
+//            }
+//        }
+//
+//        Map<String, Object> vision = Map.of(
+//                "regiones_editables", regionesUnicas
+//        );
+//
+//        PlantillaVision pv = new PlantillaVision(
+//                null,
+//                plantilla,
+//                vision, // Map<String,Object>
+//                hashEstructura,
+//                LocalDateTime.now()
+//        );
+//
+//        plantillaVisionRepo.save(pv);
+//
+//        log.info("👁️ Vision detectó {} regiones ({} tras deduplicar)",
+//                regionesTotales.size(),
+//                regionesUnicas.size());
+//
+//
+//        // 3️⃣ DeepSeek conciliador (POR REGIÓN)
+//        /*
+//        log.info("🤝 Conciliando POI + Vision (por región)…");
+//
+//        List<Map<String, Object>> accionesTotales = new ArrayList<>();
+//
+//        List<Map<String, Object>> regiones =
+//                (List<Map<String, Object>>) vision.getOrDefault("regiones", List.of());
+//
+//        for (Map<String, Object> region : regiones) {
+//
+//            String hint = (String) region.get("hint_text");
+//            log.info("🧠 Conciliando región visual: {}", hint);
+//
+//        }
+//        */
+//
+//        // 3️⃣ DeepSeek: extracción de filas con ":"
+//        log.info("🤝 Extrayendo filas editables (:) con DeepSeek…");
+//
+//        List<Map<String, Object>> accionesTotales =
+//                deepSeekClient.conciliarRegion(
+//                        estructuraPOI,
+//                        Map.of() // region ignorada
+//                );
+//
+//        guardarAccionesComoPlantilla(
+//                accionesTotales,
+//                plantilla,
+//                hashEstructura
+//        );
+//
+//
+//        return Map.of(
+//                "estructuraPOI", estructuraPOI,
+//                "vision", vision
+//        );
+//    }
 
-        long inicio = System.currentTimeMillis();
-        log.info("🧠 Iniciando análisis de plantilla {}", plantillaId);
 
-        Plantilla plantilla = plantillaRepo.findById(plantillaId)
-                .orElseThrow(() -> new RuntimeException("Plantilla no encontrada"));
+@Transactional
+public Map<String, Object> analizarPlantilla(Long plantillaId) throws Exception {
 
-        String hashEstructura = DigestUtils.sha256Hex(
-                plantilla.getArchivoOriginal()
-        );
+    long inicio = System.currentTimeMillis();
+    log.info("🧠 Iniciando análisis de plantilla {}", plantillaId);
 
-        // ♻️ SI YA EXISTE ANÁLISIS → NO REANALIZAR
-        if (plantillaAccionRepo.existsByPlantillaId(plantillaId)) {
-            log.info("♻️ Plantilla {} ya analizada, reutilizando análisis", plantillaId);
-            return cargarAnalisisDesdeBD(plantilla);
+    Plantilla plantilla = plantillaRepo.findById(plantillaId)
+            .orElseThrow(() -> new RuntimeException("Plantilla no encontrada"));
+
+    String hashEstructura = DigestUtils.sha256Hex(
+            plantilla.getArchivoOriginal()
+    );
+
+    // ♻️ Reutilización
+    if (plantillaAccionRepo.existsByPlantillaId(plantillaId)) {
+        log.info("♻️ Plantilla {} ya analizada, reutilizando análisis", plantillaId);
+        return cargarAnalisisDesdeBD(plantilla);
+    }
+
+    XWPFDocument doc = new XWPFDocument(
+            new ByteArrayInputStream(plantilla.getArchivoOriginal())
+    );
+
+    limpiarEstructuraAnterior(plantilla);
+
+    // ============================================================
+    // 1️⃣ POI – ESTRUCTURA FÍSICA
+    // ============================================================
+    log.info("📄 Extrayendo estructura POI…");
+    Map<String, Object> estructuraPOI = extraerEstructuraCompacta(doc);
+
+    List<Map<String, Object>> tablas =
+            (List<Map<String, Object>>) estructuraPOI.getOrDefault("tablas", List.of());
+
+    List<Map<String, Object>> parrafos =
+            (List<Map<String, Object>>) estructuraPOI.getOrDefault("parrafos", List.of());
+
+    log.info("📐 POI listo: {} tablas, {} párrafos", tablas.size(), parrafos.size());
+
+    // ============================================================
+    // 2️⃣ VISIÓN – CONTEXTO SEMÁNTICO (NO OBLIGATORIO)
+    // ============================================================
+    log.info("👁️ Ejecutando análisis visual (Vision)…");
+
+    byte[] pdf = wordToPdfService.convertirWordAPdf(
+            plantilla.getArchivoOriginal()
+    );
+
+    List<byte[]> pngs = pdfToPngService.convertirTodasLasPaginasAPng(pdf);
+
+    List<Map<String, Object>> regionesTotales = new ArrayList<>();
+
+    for (int i = 0; i < pngs.size(); i++) {
+
+        String base64 = Base64.getEncoder().encodeToString(pngs.get(i));
+
+        Map<String, Object> visionPagina =
+                gptVisionClient.analizarImagen(
+                        base64,
+                        VisionPrompts.ANALISIS_VISUAL,
+                        "Analiza esta página del documento."
+                );
+
+        Object regionesRaw = visionPagina.get("regiones");
+        log.info("👁️ Vision RAW keys: {}", visionPagina.keySet());
+        if (regionesRaw instanceof List<?> lista) {
+            regionesTotales.addAll((List<Map<String, Object>>) lista);
         }
+    }
 
-        XWPFDocument doc = new XWPFDocument(
-                new ByteArrayInputStream(plantilla.getArchivoOriginal())
-        );
+    // 🔁 Deduplicación visual por ancla + tipo
+    Set<String> firmas = new HashSet<>();
+    List<Map<String, Object>> regionesUnicas = new ArrayList<>();
 
-        limpiarEstructuraAnterior(plantilla);
+    for (Map<String, Object> r : regionesTotales) {
+        String firma = r.get("ancla_visual") + "|" + r.get("tipo_region");
+        if (firmas.add(firma)) {
+            regionesUnicas.add(r);
+        }
+    }
 
-        // 1️⃣ POI
-        log.info("📄 Extrayendo estructura POI…");
-        Map<String, Object> estructuraPOI = extraerEstructuraCompacta(doc);
+    Map<String, Object> visionContext = Map.of(
+            "regiones_editables", regionesUnicas
+    );
 
-        List<?> tablas = (List<?>) estructuraPOI.getOrDefault("tablas", List.of());
-        log.info("📐 POI listo: {} tablas", tablas.size());
+    log.info("👁️ Vision detectó {} regiones ({} únicas)",
+            regionesTotales.size(), regionesUnicas.size());
 
-        // 2️⃣ Word → PNG → GPT-4o Vision
-        log.info("🖼️ Convirtiendo Word a PNG para análisis visual…");
+    // ============================================================
+    // 3️⃣ DEEPSEEK EN PARALELO (TABLAS + VISIÓN)
+    // ============================================================
+    log.info("⚡ Extrayendo campos editables con DeepSeek (paralelo)…");
 
-        byte[] pdf = wordToPdfService.convertirWordAPdf(
-                plantilla.getArchivoOriginal()
-        );
+    List<Future<List<Map<String, Object>>>> futures = new ArrayList<>();
 
-        List<byte[]> pngs = pdfToPngService.convertirTodasLasPaginasAPng(pdf);
-        List<Map<String, Object>> regionesTotales = new ArrayList<>();
+    for (Map<String, Object> tabla : tablas) {
 
-        for (int i = 0; i < pngs.size(); i++) {
+        futures.add(
+                iaExecutor.submit(() -> {
 
-            String base64 = Base64.getEncoder().encodeToString(pngs.get(i));
-
-            Map<String, Object> visionPagina =
-                    gptVisionClient.analizarImagen(
-                            base64,
-                            VisionPrompts.ANALISIS_VISUAL,
-                            "Analiza esta página de la historia clínica."
+                    Map<String, Object> poiParcial = Map.of(
+                            "tablas", List.of(tabla)
                     );
 
-            Object regionesRaw = visionPagina.get("regiones");
-
-            List<Map<String, Object>> regionesPagina = new ArrayList<>();
-
-            if (regionesRaw instanceof List<?> lista) {
-                regionesPagina.addAll((List<Map<String, Object>>) lista);
-            }
-            else if (regionesRaw instanceof Map<?, ?> map) {
-                regionesPagina.add((Map<String, Object>) map);
-            }
-
-            regionesTotales.addAll(regionesPagina);
-
-        }
-
-// 🔁 Deduplicación estructural segura
-        Set<String> firmas = new HashSet<>();
-        List<Map<String, Object>> regionesUnicas = new ArrayList<>();
-
-        for (Map<String, Object> r : regionesTotales) {
-            String firma =
-                    r.get("ancla_visual") + "|" +
-                            r.get("tipo_region");
-            if (firmas.add(firma)) {
-                regionesUnicas.add(r);
-            }
-        }
-
-        Map<String, Object> vision = Map.of(
-                "regiones_editables", regionesUnicas
-        );
-
-        PlantillaVision pv = new PlantillaVision(
-                null,
-                plantilla,
-                vision, // Map<String,Object>
-                hashEstructura,
-                LocalDateTime.now()
-        );
-
-        plantillaVisionRepo.save(pv);
-
-        log.info("👁️ Vision detectó {} regiones ({} tras deduplicar)",
-                regionesTotales.size(),
-                regionesUnicas.size());
-
-
-        // 3️⃣ DeepSeek conciliador (POR REGIÓN)
-        log.info("🤝 Conciliando POI + Vision (por región)…");
-
-        List<Map<String, Object>> accionesTotales = new ArrayList<>();
-
-        List<Map<String, Object>> regiones =
-                (List<Map<String, Object>>) vision.getOrDefault("regiones", List.of());
-
-        for (Map<String, Object> region : regiones) {
-
-            String hint = (String) region.get("hint_text");
-            log.info("🧠 Conciliando región visual: {}", hint);
-
-        }
-
-
-        return Map.of(
-                "estructuraPOI", estructuraPOI,
-                "vision", vision
+                    return deepSeekClient.conciliarRegion(
+                            poiParcial,
+                            visionContext   // 👈 VISIÓN COMO AYUDA
+                    );
+                })
         );
     }
 
+    // ============================================================
+    // 3️⃣B DEEPSEEK PARA PÁRRAFOS (CON VISIÓN)
+    // ============================================================
+    if (!parrafos.isEmpty()) {
+
+        log.info("🧠 Procesando párrafos como unidades editables…");
+
+        futures.add(
+                iaExecutor.submit(() -> {
+
+                    List<Map<String, Object>> filas = new ArrayList<>();
+
+                    for (Map<String, Object> p : parrafos) {
+
+                        Map<String, Object> celda = new LinkedHashMap<>();
+                        celda.put("tabla", null);
+                        celda.put("fila", p.get("indexParrafo"));
+                        celda.put("columna", null);
+                        celda.put("texto", p.get("texto"));
+
+                        Map<String, Object> fila = new LinkedHashMap<>();
+                        fila.put("fila", p.get("indexParrafo"));
+                        fila.put("celdas", List.of(celda));
+
+                        filas.add(fila);
+                    }
+
+                    Map<String, Object> tablaParrafos = new LinkedHashMap<>();
+                    tablaParrafos.put("tabla", null);
+                    tablaParrafos.put("filas", filas);
+
+                    Map<String, Object> poiParrafos = new LinkedHashMap<>();
+                    poiParrafos.put("tablas", List.of(tablaParrafos));
+
+                    return deepSeekClient.conciliarRegion(
+                            poiParrafos,
+                            visionContext   // 👈 VISIÓN TAMBIÉN AQUÍ
+                    );
+                })
+        );
+    }
+
+    // ============================================================
+    // 4️⃣ RECOLECCIÓN DE RESULTADOS
+    // ============================================================
+    List<Map<String, Object>> accionesTotales = new ArrayList<>();
+
+    for (Future<List<Map<String, Object>>> future : futures) {
+        try {
+            List<Map<String, Object>> resultado = future.get();
+            if (resultado != null && !resultado.isEmpty()) {
+                accionesTotales.addAll(resultado);
+            }
+        } catch (Exception e) {
+            Throwable root = (e instanceof java.util.concurrent.ExecutionException ex && ex.getCause() != null)
+                    ? ex.getCause()
+                    : e;
+
+            log.error("💥 Error en tarea IA: {}", root.getMessage(), root);
+        }
+    }
+
+    log.info("🧾 Total de campos detectados: {}", accionesTotales.size());
+
+    // ============================================================
+    // 5️⃣ GUARDADO
+    // ============================================================
+    guardarAccionesComoPlantilla(
+            accionesTotales,
+            plantilla,
+            hashEstructura
+    );
+
+    return Map.of(
+            "origen", "POI+VISION+DEEPSEEK+THREADS",
+            "plantillaId", plantillaId,
+            "duracion_ms", System.currentTimeMillis() - inicio,
+            "accionesDetectadas", accionesTotales.size(),
+            "vision", visionContext
+    );
+}
     private void guardarAccionesComoPlantilla(
             List<Map<String, Object>> acciones,
             Plantilla plantilla,
@@ -217,22 +430,34 @@ public class PlantillaProcessorService {
         for (Map<String, Object> a : acciones) {
 
 
+            /*
             String tipoRegionRaw =
                     ((String) a.get("tipo_region"))
                             .trim()
                             .toUpperCase();
 
+
             if (!EnumUtils.isValidEnum(TipoRegion.class, tipoRegionRaw)) {
                 throw new IllegalStateException(
                         "Tipo de región inválido: " + tipoRegionRaw
                 );
+            }*/
+
+            String accionRaw = (String) a.get("accion");
+
+            if (accionRaw == null) {
+                log.warn("⚠️ Acción sin tipo detectada, se ignora: {}", a);
+                continue;
             }
+
+
+            Integer columna = (Integer) a.get("columna");
 
             PlantillaAccion accion = PlantillaAccion.builder()
                     .plantilla(plantilla)
                     .indexTabla((Integer) a.get("tabla"))
                     .indexFila((Integer) a.get("fila"))
-                    .indexColumna((Integer) a.get("columna"))
+                    .indexColumna(columna)
                     .textoOriginal((String) a.get("textoOriginal"))
                     .descripcion((String) a.get("descripcion"))
                     .tipoAccion(
