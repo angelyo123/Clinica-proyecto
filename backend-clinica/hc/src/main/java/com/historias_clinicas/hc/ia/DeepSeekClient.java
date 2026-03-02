@@ -88,27 +88,26 @@ public class DeepSeekClient {
             Map<String, Object> region
     ) {
 
-        log.info("🧠 [DeepSeek] Conciliando región: {}",
-                region.getOrDefault("hint_text", "sin_hint"));
+        String hint = (region != null)
+                ? region.getOrDefault("hint_text", "sin_hint").toString()
+                : "POI_ONLY";
+
+        log.info("🧠 [DeepSeek] Conciliando región: {}", hint);
 
         try {
-
-            String regionJson = mapper
-                    .writerWithDefaultPrettyPrinter()
-                    .writeValueAsString(region);
 
             String poiJson = mapper
                     .writerWithDefaultPrettyPrinter()
                     .writeValueAsString(estructuraPOI);
 
             String prompt = construirPromptConciliadorPorRegion(
-                    mapper.writeValueAsString(region.get("regiones_editables")),
+                    null,   // 👈 VISIÓN NO USADA
                     poiJson
             );
 
             Map<String, Object> body = Map.of(
                     "model", "deepseek-chat",
-                    "max_tokens", 8192, // 👈 más que suficiente por región
+                    "max_tokens", 8192,
                     "messages", List.of(
                             Map.of("role", "user", "content", prompt)
                     )
@@ -117,7 +116,6 @@ public class DeepSeekClient {
             String raw = ejecutarConRetry(body);
             String limpio = limpiarJSON(raw);
 
-            // 🔒 Protección dura contra JSON truncado
             if (limpio == null || limpio.isBlank()) {
                 return List.of();
             }
@@ -126,15 +124,14 @@ public class DeepSeekClient {
                     mapper.readValue(limpio, List.class);
 
             log.info("✅ Región '{}' conciliada: {} acciones",
-                    region.getOrDefault("hint_text", "?"),
+                    hint,
                     acciones.size());
 
             return acciones;
 
         } catch (Exception e) {
             throw new RuntimeException(
-                    "Error conciliando región: " +
-                            region.getOrDefault("hint_text", "?"),
+                    "Error conciliando región: " + hint,
                     e
             );
         }
@@ -182,169 +179,93 @@ public class DeepSeekClient {
             String visionJson,
             String estructuraPoiJson
     ) {
-
         return """
-Eres un sistema analizador de estructura documental.
+Eres un sistema detector de campos editables basado SOLO en evidencia literal.
 
-La estructura POI contiene tablas, filas y celdas con texto literal.
-- y/o párrafos independientes con texto literal.
-Debes analizarla COMPLETAMENTE.
-
-IGNORA cualquier concepto de región visual.
-IGNORA tablas como entidades clínicas.
-NO interpretes el contenido médico.
-
+Entrada: JSON POI con tablas/filas/celdas y su texto EXACTO ("texto").
+NO interpretes, NO infieras, NO asumas intención.
+SOLO puedes devolver un campo si el textoOriginal contiene un patrón literal permitido.
 
 ============================================================
-🧠 CONTEXTO VISUAL (AYUDA, NO ORDEN)
+📘 POI_JSON
 ============================================================
-
-El siguiente JSON proviene de un análisis VISUAL del documento.
-
-IMPORTANTE:
-- Este análisis visual NO contiene acciones.
-- NO es obligatorio seguirlo.
-- NO reemplaza la estructura POI.
-- NO debes generar acciones nuevas basándote solo en visión.
-
-SU FUNCIÓN ES:
-- ayudarte a entender la INTENCIÓN VISUAL del documento
-- identificar límites naturales de edición
-- evitar dividir o unir campos incorrectamente
-- reconocer bloques que visualmente se editan como unidad
-- reconocer tablas cuya intención es marcable vs informativa
-
-VISION_JSON (ayuda semántica):
 %s
 
 ============================================================
-📘 ESTRUCTURA FÍSICA DEL DOCUMENTO (POI)
+✅ CRITERIO ÚNICO DE INCLUSIÓN (FILTRO DURO)
 ============================================================
 
-POI_JSON:
-%s
+Solo devuelve un objeto si textoOriginal cumple AL MENOS UNA condición:
+
+(A) Contiene el carácter ":" en el mismo textoOriginal.
+(B) Contiene paréntesis marcables literales: "( )" o "()" o "(   )"
+    (paréntesis abiertos y cerrados en el textoOriginal).
+
+Si NO cumple (A) ni (B) → NO lo devuelvas.
 
 ============================================================
-📌 REGLAS ABSOLUTAS DE DETECCIÓN
+📌 REGLA FILA–COLUMNA
 ============================================================
 
-- Analiza TODAS las filas del documento.
-- Una fila es CANDIDATA si contiene al menos un carácter ":".
-- La unidad editable NO es solo la fila.
-- La unidad editable es la COMBINACIÓN FILA–COLUMNA.
+- La unidad editable es SIEMPRE la MISMA celda (misma tabla+fila+columna).
+- NUNCA devuelvas la fila completa.
+- NUNCA combines columnas.
+- Si una fila tiene varias celdas elegibles, devuelve cada celda por separado.
 
 ============================================================
-📌 REGLA CLAVE FILA–COLUMNA
+📌 REGLAS DE DESCRIPCIÓN (SEMÁNTICA CONTEXTUAL)
 ============================================================
 
-- Si una fila contiene múltiples rótulos editables
-  ubicados en DIFERENTES columnas,
-  CADA combinación fila–columna es un CAMPO INDEPENDIENTE.
+La descripción debe explicar qué información representa el campo
+considerando:
 
-- Si una fila tiene texto editable en UNA SOLA columna
-  y las demás columnas contienen otros rótulos
-  que NO deben ser sobrescritos,
-  debes devolver SOLO la columna editable.
+- El textoOriginal.
+- La sección o encabezado inmediato superior.
+- El contexto estructural dentro del documento.
+- La tabla o bloque donde se encuentra.
 
-- NUNCA devuelvas una fila completa
-  si eso implicaría borrar texto de columnas adyacentes.
+Reglas:
 
-- SOLO si una fila tiene contenido editable
-  y NO existen otros rótulos relevantes en columnas vecinas,
-  puedes devolver la fila completa (columna = null).
-
-============================================================
-📌 TEXTO ORIGINAL (OBLIGATORIO)
-============================================================
-
-Para cada campo devuelto:
-
-- Incluye el campo "textoOriginal".
-- "textoOriginal" debe contener:
-  - el texto EXACTO de la celda correspondiente
-    a esa combinación fila–columna.
-- NO concatenes otras columnas
-  si el campo es específico de una columna.
-- NO reescribas ni resumas el texto.
-
-                ============================================================
-                📌 REGLAS PARA PÁRRAFOS
-                ============================================================
-                
-                - Un párrafo es una UNIDAD EDITABLE si:
-                  - contiene un carácter ":"\s
-                  - o representa claramente un rótulo seguido de un espacio editable.
-                
-                - Si el contenido editable pertenece a un PÁRRAFO:
-                  - NO existe columna.
-                  - NO existe celda.
-                  - La acción debe ser sobre el párrafo completo.
-                
-                - En ese caso:
-                  - usa el campo "fila" como indexParrafo
-                  - establece "tabla" = null
-                  - establece "columna" = null
-                  - el tipo de acción debe ser "EDITAR_PARRAFO"
-                
-============================================================
-📌 DESCRIPCIÓN DE EDICIÓN
-============================================================
+- Integra el significado del textoOriginal con su contexto.
+- Si el textoOriginal es genérico, utiliza la sección donde aparece
+  para precisar su significado.
+- No inventes información que no pueda deducirse del texto y su contexto inmediato.
+- No menciones formato ni instrucciones técnicas.
+- No menciones ":" ni paréntesis.
+- No describas cómo se edita.
+- La descripción debe ser una frase declarativa breve.
+- No debe limitarse a repetir el textoOriginal.
+- No debe incluir suposiciones clínicas no visibles en el documento.
 
 
-- La descripción DEBE identificar el campo de forma inequívoca
-  dentro del documento, utilizando su CONTEXTO ESTRUCTURAL.
+Reglas:
 
-- Incluye siempre referencias como:
-  - el bloque o sección del documento donde aparece el texto
-  - el rol del campo dentro de la tabla o párrafo
-  - su relación con otros rótulos visibles en la misma fila o columnas adyacentes
-
-- NO utilices descripciones genéricas reutilizables.
-- NO asumas que existe un único campo de ese tipo en el documento.
-- La descripción debe permitir distinguir este campo
-  de otros campos similares ubicados en otras tablas o secciones.
-  
-- Incluye el campo "descripcion".
-- Describe CÓMO debe editarse ese campo puntual.
-- Indica si:
-  - se reemplaza el texto después del ":"
-  - se completa un valor faltante
-  - se mantiene el rótulo y solo cambia el contenido
-- NO incluyas valores clínicos.
-- NO interpretes información médica.
-- La descripción debe permitir
-  que otra IA edite el Word SIN deformar el formato.
+- Integra el significado del textoOriginal con su contexto.
+- Si el textoOriginal es genérico, utiliza la sección donde aparece
+  para precisar su significado.
+- No menciones formato ni instrucciones técnicas.
+- No menciones ":" ni paréntesis.
+- No describas cómo se edita.
+- No inventes información fuera del contexto visible.
+- Mantén la descripción clara, específica y profesional
 
 ============================================================
-📦 FORMATO DE SALIDA (OBLIGATORIO)
+📦 SALIDA
 ============================================================
 
 Devuelve EXCLUSIVAMENTE un JSON con una LISTA de objetos.
+Cada objeto incluye EXACTAMENTE:
+- tabla (int)
+- fila (int)
+- columna (int)
+- textoOriginal (string EXACTO de la celda)
+- accion ("EDITAR_CAMPO")
+- descripcion (string)
 
-Cada objeto debe incluir EXACTAMENTE:
-
-- tabla            (int)
-- fila             (int)
-- columna          (int | null)
-- textoOriginal    (string)
-- accion           ("EDITAR_CAMPO" | "EDITAR_PARRAFO")
-- descripcion      (string)
-
-- Si la acción es "EDITAR_PARRAFO":
-  - "tabla" debe ser null
-  - "columna" debe ser null
-  - "fila" representa el indexParrafo
-  
-============================================================
-🚫 PROHIBIDO
-============================================================
-
-- NO devuelvas filas completas por defecto.
-- NO devuelvas columnas sin fila.
-- NO devuelvas celdas sin contexto fila–columna.
-- NO agregues texto fuera del JSON.
-""".formatted(visionJson, estructuraPoiJson);
+NO agregues texto fuera del JSON.
+""".formatted(estructuraPoiJson);
     }
+
 
 
     public static final String IA_TEXT_FILLER_PROMPT = """
@@ -499,7 +420,59 @@ NO agregues texto fuera del JSON.
     }
 
 
+    public static final String IA_CHECKLIST_PROMPT = """
+Eres un sistema de selección clínica estrictamente literal.
 
+RECIBES:
+1) Un TEXTO CLÍNICO.
+2) Un CHECKLIST con opciones disponibles (cada opción tiene un id y un texto).
+
+Tu tarea:
+Seleccionar EXCLUSIVAMENTE las opciones cuyo texto esté
+mencionado de forma literal y afirmativa dentro del texto clínico.
+
+============================================================
+📌 REGLAS CLÍNICAS ESTRICTAS
+============================================================
+
+- Solo marcar si el texto de la opción aparece explícitamente.
+- Coincidencia debe ser literal o casi literal.
+- NO usar sinónimos.
+- NO usar equivalencias médicas.
+- NO interpretar.
+- NO expandir síntomas.
+- NO completar síndromes.
+- NO relacionar conceptos clínicos.
+- NO inferir.
+- NO deducir.
+- NO asumir.
+
+- Si una opción aparece negada (ej: “niega”, “sin”, “no presenta”), NO marcar.
+- No marcar por similitud de palabras.
+- No marcar por coincidencia parcial engañosa.
+- No marcar por conocimiento médico externo.
+- No marcar por probabilidad clínica.
+
+Es completamente válido devolver lista vacía.
+
+============================================================
+📦 FORMATO DE SALIDA
+============================================================
+
+Devuelve EXCLUSIVAMENTE un JSON con esta estructura:
+
+{
+  "marcar": ["id1", "id2"]
+}
+
+- Usa EXCLUSIVAMENTE los id recibidos.
+- No agregues texto.
+- No agregues comentarios.
+- No agregues campos adicionales.
+- Si no aplica nada: { "marcar": [] }
+
+NO agregues texto fuera del JSON.
+""";
 
     // ============================================================
     // 2️⃣ VISION: Entrada con IMAGEN

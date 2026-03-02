@@ -1,6 +1,7 @@
 package com.historias_clinicas.hc.controladores;
 
 import com.historias_clinicas.hc.dto.CampoValorConfirmado;
+import com.historias_clinicas.hc.entidades.ConfirmarRequest;
 import com.historias_clinicas.hc.entidades.HistoriaClinicaVersion;
 import com.historias_clinicas.hc.entidades.PlantillaAccion;
 import com.historias_clinicas.hc.entidades.PlantillaCampo;
@@ -85,10 +86,14 @@ public class HCIAController {
                 }
             });
 
+            List<Map<String,Object>> accionesChecklist =
+                    plantillaProcessorService.procesarChecklists(plantillaId, texto);
+
             return ResponseEntity.ok(Map.of(
-                    "mensaje", "Previsualización generada desde texto",
+                    "mensaje","Previsualización generada desde texto",
                     "data", Map.of(
-                            "jsonConfirmar", jsonConfirmar
+                            "jsonConfirmar", jsonConfirmar,
+                            "accionesChecklist", accionesChecklist
                     )
             ));
 
@@ -177,32 +182,39 @@ public class HCIAController {
         }
     }
 
-    // -------------------------------------------------------------
-    // 3. CONFIRMAR → GUARDAR → WORD → PDF
-    // -------------------------------------------------------------
     @PostMapping(
             value = "/{versionId}/confirmar",
             produces = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
     )
     public ResponseEntity<byte[]> confirmarDescarga(
             @PathVariable Long versionId,
-            @RequestBody Map<String, String> valoresPlano
+            @RequestBody ConfirmarRequest req
     ) {
         try {
 
             var version = versionRepo.findById(versionId)
                     .orElseThrow(() -> new RuntimeException("Versión no encontrada"));
 
-            List<CampoValorConfirmado> valores =
-                    documentoService.guardarValoresAcciones(version, valoresPlano);
+            Long plantillaId = version.getHistoriaClinica().getPlantilla().getId();
 
-            byte[] word = documentoService.generarWord(version, valores);
+            // 1) valores texto (ids BD -> coordenadas)
+            List<CampoValorConfirmado> valoresTexto =
+                    documentoService.guardarValoresAcciones(version, req.getValoresPlano());
+
+            // 2) acciones checklist (runtime)
+            List<Map<String, Object>> accionesChecklist =
+                    plantillaProcessorService.procesarChecklists(plantillaId, req.getTextoClinico());
+
+            // 3) generar word con TODO
+            byte[] word = documentoService.generarWordConChecklist(
+                    version,
+                    valoresTexto,
+                    accionesChecklist
+            );
 
             return ResponseEntity.ok()
-                    .header("Content-Type",
-                            "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
-                    .header("Content-Disposition",
-                            "attachment; filename=HC_" + versionId + ".docx")
+                    .header("Content-Type", "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+                    .header("Content-Disposition", "attachment; filename=HC_" + versionId + ".docx")
                     .body(word);
 
         } catch (Exception e) {
@@ -210,5 +222,94 @@ public class HCIAController {
             return ResponseEntity.internalServerError()
                     .body(("ERROR: " + e.getMessage()).getBytes());
         }
+    }
+
+    // -------------------------------------------------------------
+// DEBUG: DETECTAR TABLAS REALES
+// -------------------------------------------------------------
+    @GetMapping("/plantilla/{plantillaId}/detectar-tablas")
+    public ResponseEntity<?> detectarTablas(
+            @PathVariable Long plantillaId
+    ) {
+        try {
+
+            Map<String, Object> estructura =
+                    plantillaProcessorService.extraerEstructuraPoi(plantillaId)
+                            .get("estructura") instanceof Map<?,?> e
+                            ? (Map<String, Object>) e
+                            : Map.of();
+
+            List<Map<String, Object>> tablas =
+                    (List<Map<String, Object>>) estructura.getOrDefault("tablas", List.of());
+
+            List<Object> resultado = new ArrayList<>();
+
+            for (Map<String, Object> tabla : tablas) {
+
+                List<Map<String, Object>> detectadas =
+                        plantillaProcessorService.detectarTablasRealesEnTabla(tabla);
+
+                if (!detectadas.isEmpty()) {
+
+                    for (Map<String, Object> sub : detectadas) {
+
+                        String tipo = (String) sub.get("tipo");
+
+                        if ("CHECKLIST".equals(tipo)) {
+
+                            List<Map<String, Object>> items =
+                                    (List<Map<String, Object>>) sub.getOrDefault("items", List.of());
+
+                            resultado.add(Map.of(
+                                    "tablaFisica", tabla.get("tabla"),
+                                    "tipo", "CHECKLIST",
+                                    "cantidadItems", items.size(),
+                                    "subtabla", sub
+                            ));
+
+                        } else {
+
+                            List<Map<String, Object>> filas =
+                                    (List<Map<String, Object>>) sub.getOrDefault("filas", List.of());
+
+                            if (filas.isEmpty()) continue;
+
+                            resultado.add(Map.of(
+                                    "tablaFisica", tabla.get("tabla"),
+                                    "tipo", "TABLA",
+                                    "filasDetectadas", filas.size(),
+                                    "filaInicio", filas.get(0).get("fila"),
+                                    "filaFin", filas.get(filas.size() - 1).get("fila"),
+                                    "subtabla", sub
+                            ));
+                        }
+                    }
+                }
+            }
+
+            return ResponseEntity.ok(Map.of(
+                    "mensaje", "Tablas reales detectadas",
+                    "cantidad", resultado.size(),
+                    "tablas", resultado
+            ));
+
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError()
+                    .body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @PostMapping("/plantilla/{id}/checklist")
+    public ResponseEntity<?> marcarChecklist(
+            @PathVariable Long id,
+            @RequestBody Map<String, String> body
+    ) throws Exception {
+
+        String textoClinico = body.get("texto");
+
+        List<Map<String, Object>> acciones =
+                plantillaProcessorService.procesarChecklists(id, textoClinico);
+
+        return ResponseEntity.ok(acciones);
     }
 }

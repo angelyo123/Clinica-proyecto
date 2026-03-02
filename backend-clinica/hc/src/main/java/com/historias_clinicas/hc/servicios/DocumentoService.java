@@ -88,4 +88,43 @@ public class DocumentoService {
             throw new RuntimeException("Error generando Word", e);
         }
     }
+
+    public List<CampoValorConfirmado> convertirAccionesChecklistAMarcas(
+            List<Map<String, Object>> accionesChecklist
+    ) {
+        List<CampoValorConfirmado> marcas = new ArrayList<>();
+
+        for (Map<String, Object> a : accionesChecklist) {
+
+            Object accion = a.get("accion");
+            if (!"MARCAR".equals(String.valueOf(accion))) continue;
+
+            CampoValorConfirmado dto = new CampoValorConfirmado();
+            dto.setValor("X"); // o "✔" si tu fuente lo soporta
+
+            dto.setIndexTabla((Integer) a.get("tabla"));
+            dto.setIndexFila((Integer) a.get("fila"));
+            dto.setIndexCelda((Integer) a.get("columna"));
+
+            dto.setIndexParrafo(null);
+
+            marcas.add(dto);
+        }
+
+        return marcas;
+    }
+
+    public byte[] generarWordConChecklist(
+            HistoriaClinicaVersion version,
+            List<CampoValorConfirmado> valoresTexto,
+            List<Map<String, Object>> accionesChecklist
+    ) {
+        List<CampoValorConfirmado> marcas = convertirAccionesChecklistAMarcas(accionesChecklist);
+
+        List<CampoValorConfirmado> todo = new ArrayList<>();
+        todo.addAll(valoresTexto);
+        todo.addAll(marcas);
+
+        return generarWord(version, todo);
+    }
 }

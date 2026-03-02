@@ -9,8 +9,13 @@ import java.util.concurrent.Executors;
 @Configuration
 public class IAExecutorConfig {
 
-    @Bean
-    public ExecutorService iaExecutor() {
+    @Bean(name = "visionExecutor")
+    public ExecutorService visionExecutor() {
         return Executors.newFixedThreadPool(8);
+    }
+
+    @Bean(name = "deepSeekExecutor")
+    public ExecutorService deepSeekExecutor() {
+        return Executors.newFixedThreadPool(3);
     }
 }
