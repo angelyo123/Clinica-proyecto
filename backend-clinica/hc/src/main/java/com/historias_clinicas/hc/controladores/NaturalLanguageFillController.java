@@ -1,4 +1,4 @@
 package com.historias_clinicas.hc.controladores;
 
-public class HCIAController {
+public class NaturalLanguageFillController {
 }
