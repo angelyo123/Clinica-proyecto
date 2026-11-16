@@ -1,16 +1,13 @@
 package com.historias_clinicas.hc.dto;
 
-import lombok.Data;
+import lombok.Getter;
+import lombok.Setter;
 
-@Data
+@Getter
+@Setter
 public class CampoValorConfirmado {
 
+    private String stableId;
     private String valor;
-    private String nombre; // opcional, pero útil para debug
-
-    private Integer indexTabla;
-    private Integer indexFila;
-    private Integer indexCelda;
-    private Integer indexParrafo;
-
+    private String tipoDato;
 }

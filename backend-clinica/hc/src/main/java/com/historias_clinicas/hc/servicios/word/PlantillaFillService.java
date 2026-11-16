@@ -1,139 +1,189 @@
 package com.historias_clinicas.hc.servicios.word;
 
+import com.historias_clinicas.hc.cognitive.FieldDefinition;
 import com.historias_clinicas.hc.dto.CampoValorConfirmado;
+import com.historias_clinicas.hc.fill.MarkExecutor;
+import com.historias_clinicas.hc.fill.TextExecutor;
+import com.historias_clinicas.hc.visual.*;
 import lombok.RequiredArgsConstructor;
 import org.apache.poi.xwpf.usermodel.*;
 import org.springframework.stereotype.Service;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
 public class PlantillaFillService {
 
+
+    private MarkExecutor  markExecutor;
+    private TextExecutor textExecutor;
+
     public byte[] llenarWord(
             byte[] plantillaBytes,
-            List<CampoValorConfirmado> valores
+            List<CampoValorConfirmado> valores,
+            List<FieldDefinition> defs
     ) throws Exception {
+
+
 
         XWPFDocument doc = new XWPFDocument(
                 new ByteArrayInputStream(plantillaBytes)
         );
 
-        for (CampoValorConfirmado v : valores) {
+        Map<String, FieldDefinition> defsPorWriteId = defs.stream()
+                .collect(Collectors.toMap(
+                        FieldDefinition::getWriteStableId,
+                        d -> d,
+                        (a, b) -> a,
+                        LinkedHashMap::new
+                ));
 
-            // ===============================
-            // CASO 1: CELDA DE TABLA
-            // indexCelda aquí se interpreta como COLUMNA VISUAL (columnaMarcable)
-            // ===============================
-            if (v.getIndexTabla() != null &&
-                    v.getIndexFila()  != null &&
-                    v.getIndexCelda() != null) {
+        VisualDocumentBuilder builder = new VisualDocumentBuilder();
+        VisualDocument visual = builder.build(doc);
 
-                XWPFTable tabla = doc.getTableArray(v.getIndexTabla());
-                if (tabla == null) continue;
+        StableIdGenerator generator = new StableIdGenerator();
+        generator.generarIds(visual);
 
-                XWPFTableRow fila = tabla.getRow(v.getIndexFila());
-                if (fila == null) continue;
+        // 🔥 AQUÍ VA
+        Map<String, List<CampoValorConfirmado>> valoresPorId =
+                valores.stream().collect(java.util.stream.Collectors.groupingBy(
+                        CampoValorConfirmado::getStableId
+                ));
 
-                // ✅ Convertir columnaVisual -> celda real (respeta merges/gridspan)
-                XWPFTableCell celda = getCellByColumnaVisual(fila, v.getIndexCelda());
-                if (celda == null) continue;
-
-                String actual = celda.getText();
-
-                // ✅ Si ya está marcada y estamos intentando marcar "X", no reescribir
-                if (celdaYaTieneMarca(actual) &&
-                        "X".equalsIgnoreCase(String.valueOf(v.getValor()))) {
-                    continue;
-                }
-
-                escribirCeldaSeguro(celda, v.getValor());
-            }
-
-            // ===============================
-            // CASO 2: PÁRRAFO
-            // ===============================
-            else if (v.getIndexParrafo() != null) {
-
-                XWPFParagraph p = doc.getParagraphArray(v.getIndexParrafo());
-                if (p == null) continue;
-
-                // limpiar runs de forma segura
-                int runs = p.getRuns() == null ? 0 : p.getRuns().size();
-                for (int i = runs - 1; i >= 0; i--) {
-                    p.removeRun(i);
-                }
-
-                p.createRun().setText(
-                        v.getValor() != null ? v.getValor() : ""
-                );
-            }
-        }
+        aplicarValores(doc, visual, valoresPorId, defsPorWriteId);
 
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         doc.write(out);
         return out.toByteArray();
     }
 
-    // ============================================================
-    // HELPERS
-    // ============================================================
 
-    private void escribirCeldaSeguro(XWPFTableCell cell, String texto) {
+    private void aplicarValores(
+            XWPFDocument doc,
+            VisualDocument visual,
+            Map<String, List<CampoValorConfirmado>> valores,
+            Map<String, FieldDefinition> defs)
 
-        // Asegurar al menos 1 párrafo
-        if (cell.getParagraphs() == null || cell.getParagraphs().isEmpty()) {
+    {
+        System.out.println("Total valores: " + valores.size());
+
+        for (VisualBlock block : visual.getBlocks()) {
+
+            if (block instanceof TableBlock tb) {
+
+                TableGrid grid = tb.getGrid();
+                CellVisual[][] matrix = grid.getMatrix();
+                XWPFTable tabla = doc.getTables().get(tb.getTableIndex());
+                for (int r = 0; r < grid.getTotalRows(); r++) {
+                    for (int c = 0; c < grid.getTotalCols(); c++) {
+                        CellVisual cell = matrix[r][c];
+                        if (cell == null) continue;
+                        if (!cell.isMaster()) continue;
+                        String stableId = cell.getStableId();
+                        System.out.println("Celda actual: " + stableId);
+                        if (!valores.containsKey(stableId)) {
+                            System.out.println("❌ NO MATCH: " + stableId);
+                            continue;
+                        }
+                        List<CampoValorConfirmado> campos = valores.get(stableId);
+                        XWPFTableRow row = tabla.getRow(r);
+                        XWPFTableCell realCell =
+                                row.getCell(cell.getColStart());
+                        System.out.println("🔥 MULTI MATCH: " + stableId + " -> " + campos.size());
+                        ejecutarGrupo(realCell, campos, defs);
+                    }
+                }
+            }
+        }
+    }
+
+
+
+    private void ejecutarGrupo(
+            XWPFTableCell cell,
+            List<CampoValorConfirmado> campos,
+            Map<String, FieldDefinition> defs
+    ) {
+        for (CampoValorConfirmado campo : campos) {
+
+            FieldDefinition def = defs.get(campo.getStableId());
+
+            if (def == null) {
+                System.out.println("❌ Sin definición para " + campo.getStableId());
+                continue;
+            }
+
+            String writeMode = def.getWriteMode();
+
+            if ("REWRITE".equals(writeMode)) {
+
+                System.out.println("🔁 REWRITE -> " + campo.getStableId());
+                writeReplace(cell, def.getRewriteText());
+
+            } else if ("MARK".equals(writeMode)) {
+
+                if (isTruthy(campo.getValor())) {
+                    System.out.println("☑️ MARK -> " + campo.getStableId());
+                    markExecutor.execute(cell, def);
+                }
+
+            } else if ("TEXT".equals(writeMode)) {
+
+                System.out.println("✍️ TEXT -> " + campo.getValor());
+                textExecutor.execute(cell, def, campo.getValor());
+
+            } else {
+
+                System.out.println("⚠️ writeMode no soportado: " + writeMode);
+            }
+        }
+    }
+
+    private void writeReplace(XWPFTableCell cell, String texto) {
+
+        if (cell.getParagraphs().isEmpty()) {
             cell.addParagraph();
         }
 
-        // Limpiar runs de todos los párrafos existentes
-        for (XWPFParagraph p : cell.getParagraphs()) {
-            int runs = p.getRuns() == null ? 0 : p.getRuns().size();
-            for (int i = runs - 1; i >= 0; i--) {
-                p.removeRun(i);
-            }
+        XWPFParagraph p = cell.getParagraphs().get(0);
+
+        // limpiar contenido
+        for (int i = p.getRuns().size() - 1; i >= 0; i--) {
+            p.removeRun(i);
         }
 
-        // Usar el primer párrafo
-        XWPFParagraph p0 = cell.getParagraphs().get(0);
-        XWPFRun run = p0.createRun();
-        run.setText(texto != null ? texto : "");
+        XWPFRun run = p.createRun();
+        run.setText(texto);
     }
 
-    /**
-     * Convierte una "columna visual" (basada en gridSpan) a la celda real de POI.
-     * Esto es CRÍTICO cuando tu pipeline calcula columnaMarcable con columnaVisual.
-     */
-    private XWPFTableCell getCellByColumnaVisual(XWPFTableRow row, int columnaVisualBuscada) {
+    private boolean isTruthy(String value) {
+        if (value == null) return false;
+        String v = value.trim().toLowerCase();
+        return v.equals("true") || v.equals("1") || v.equals("x") || v.equals("si");
+    }
 
-        int colVis = 0;
+    private void escribirCeldaSeguro(XWPFTableCell cell, String texto) {
 
-        for (XWPFTableCell cell : row.getTableCells()) {
-
-            int spanH = 1;
-
-            var tcPr = cell.getCTTc().getTcPr();
-            if (tcPr != null && tcPr.getGridSpan() != null) {
-                spanH = tcPr.getGridSpan().getVal().intValue();
-            }
-
-            // La celda cubre el rango [colVis, colVis + spanH - 1]
-            if (columnaVisualBuscada >= colVis && columnaVisualBuscada < colVis + spanH) {
-                return cell;
-            }
-
-            colVis += spanH;
+        if (cell.getParagraphs().isEmpty()) {
+            cell.addParagraph();
         }
 
-        return null;
-    }
+        XWPFParagraph p = cell.getParagraphs().get(0);
 
-    private boolean celdaYaTieneMarca(String txt) {
-        if (txt == null) return false;
-        String t = txt.trim();
-        return t.equalsIgnoreCase("x") || t.equals("✔") || t.equals("✓");
+        // ❌ NO BORRAR
+        // cell.removeParagraph(0);
+
+        // 👉 opcional: limpiar solo si quieres replace real
+        p.getRuns().clear();
+
+        XWPFRun run = p.createRun();
+        run.setText(texto);
     }
 }

@@ -1,14 +1,15 @@
 package com.historias_clinicas.hc.servicios;
 
+import com.historias_clinicas.hc.cognitive.FieldDefinition;
+import com.historias_clinicas.hc.cognitive.TargetRegion;
 import com.historias_clinicas.hc.dto.CampoValorConfirmado;
-import com.historias_clinicas.hc.entidades.CampoValor;
 import com.historias_clinicas.hc.entidades.HistoriaClinicaVersion;
-import com.historias_clinicas.hc.entidades.PlantillaAccion;
 import com.historias_clinicas.hc.entidades.PlantillaCampo;
-import com.historias_clinicas.hc.generadores.PdfGenerator;
-import com.historias_clinicas.hc.repositorios.CampoValorRepository;
+import com.historias_clinicas.hc.extraction.dto.FieldValueAI;
+import com.historias_clinicas.hc.extraction.mapper.FieldValueMapper;
+import com.historias_clinicas.hc.extraction.service.NaturalLanguageFillService;
+import com.historias_clinicas.hc.extraction.validation.FieldValueValidator;
 import com.historias_clinicas.hc.repositorios.HistoriaClinicaVersionRepository;
-import com.historias_clinicas.hc.repositorios.PlantillaAccionRepo;
 import com.historias_clinicas.hc.repositorios.PlantillaCampoRepository;
 import com.historias_clinicas.hc.servicios.word.PlantillaFillService;
 import lombok.RequiredArgsConstructor;
@@ -20,53 +21,18 @@ import java.util.*;
 @RequiredArgsConstructor
 public class DocumentoService {
 
-    private final PlantillaAccionRepo plantillaAccionRepo;
     private final PlantillaFillService plantillaFillService;
     private final HistoriaClinicaVersionRepository versionRepo;
-
-    // ============================================================
-    // CONFIRMAR VALORES (jsonConfirmar → DTOs físicos)
-    // ============================================================
-    public List<CampoValorConfirmado> guardarValoresAcciones(
-            HistoriaClinicaVersion version,
-            Map<String, String> valoresPlano
-    ) {
-
-        List<CampoValorConfirmado> confirmados = new ArrayList<>();
-
-        valoresPlano.forEach((accionIdRaw, textoFinal) -> {
-
-            Long accionId;
-            try {
-                accionId = Long.valueOf(accionIdRaw);
-            } catch (Exception e) {
-                return;
-            }
-
-            PlantillaAccion accion = plantillaAccionRepo.findById(accionId)
-                    .orElse(null);
-
-            if (accion == null) return;
-
-            CampoValorConfirmado dto = new CampoValorConfirmado();
-            dto.setValor(textoFinal);
-            dto.setIndexTabla(accion.getIndexTabla());
-            dto.setIndexFila(accion.getIndexFila());
-            dto.setIndexCelda(accion.getIndexColumna());
-            dto.setIndexParrafo(null); // por ahora
-
-            confirmados.add(dto);
-        });
-
-        return confirmados;
-    }
+    private final NaturalLanguageFillService naturalLanguageFillService;
+    private final PlantillaCampoRepository campoRepo;
 
     // ============================================================
     // GENERAR WORD
     // ============================================================
     public byte[] generarWord(
             HistoriaClinicaVersion version,
-            List<CampoValorConfirmado> valores
+            List<CampoValorConfirmado> valores,
+            List<FieldDefinition> defs
     ) {
 
         try {
@@ -76,7 +42,8 @@ public class DocumentoService {
 
             byte[] wordFinal = plantillaFillService.llenarWord(
                     plantillaBytes,
-                    valores
+                    valores,
+                    defs
             );
 
             version.setWordFinal(wordFinal);
@@ -89,24 +56,17 @@ public class DocumentoService {
         }
     }
 
-    public List<CampoValorConfirmado> convertirAccionesChecklistAMarcas(
-            List<Map<String, Object>> accionesChecklist
+    public List<CampoValorConfirmado> convertirStableIdsAMarcas(
+            List<String> stableIds
     ) {
         List<CampoValorConfirmado> marcas = new ArrayList<>();
 
-        for (Map<String, Object> a : accionesChecklist) {
-
-            Object accion = a.get("accion");
-            if (!"MARCAR".equals(String.valueOf(accion))) continue;
+        for (String id : stableIds) {
 
             CampoValorConfirmado dto = new CampoValorConfirmado();
-            dto.setValor("X"); // o "✔" si tu fuente lo soporta
-
-            dto.setIndexTabla((Integer) a.get("tabla"));
-            dto.setIndexFila((Integer) a.get("fila"));
-            dto.setIndexCelda((Integer) a.get("columna"));
-
-            dto.setIndexParrafo(null);
+            dto.setStableId(id);
+            dto.setValor("true");
+            dto.setTipoDato("booleano");
 
             marcas.add(dto);
         }
@@ -117,14 +77,147 @@ public class DocumentoService {
     public byte[] generarWordConChecklist(
             HistoriaClinicaVersion version,
             List<CampoValorConfirmado> valoresTexto,
-            List<Map<String, Object>> accionesChecklist
+            List<String> stableIdsChecklist
     ) {
-        List<CampoValorConfirmado> marcas = convertirAccionesChecklistAMarcas(accionesChecklist);
+
+        List<CampoValorConfirmado> marcas =
+                convertirStableIdsAMarcas(stableIdsChecklist);
 
         List<CampoValorConfirmado> todo = new ArrayList<>();
         todo.addAll(valoresTexto);
         todo.addAll(marcas);
 
-        return generarWord(version, todo);
+        Long plantillaId = version.getHistoriaClinica()
+                .getPlantilla()
+                .getId();
+
+        List<FieldDefinition> campos = reconstruirCampos(plantillaId);
+
+        return generarWord(version, todo, campos);
+    }
+
+    public byte[] generarWordDesdeTexto(
+            HistoriaClinicaVersion version,
+            String texto
+    ) {
+
+        try {
+
+            Long plantillaId = version.getHistoriaClinica()
+                    .getPlantilla()
+                    .getId();
+
+            // 1️⃣ cargar campos del snapshot
+            List<PlantillaCampo> camposDB =
+                    campoRepo.findByPlantillaId(plantillaId);
+
+            List<FieldDefinition> campos = reconstruirCampos(plantillaId);
+
+            // 2️⃣ IA extrae valores
+            List<FieldValueAI> valoresIA =
+                    naturalLanguageFillService.process(texto, campos);
+
+            valoresIA = FieldValueValidator.validate(valoresIA, campos);
+
+            System.out.println("===== VALORES IA =====");
+
+            valoresIA.forEach(v ->
+                    System.out.println(v.getStableId() + " -> " + v.getValor())
+            );
+
+            // 🔥 eliminar duplicados
+            valoresIA = normalizarValores(valoresIA);
+
+            // 3️⃣ convertir a DTO interno
+            List<CampoValorConfirmado> confirmados =
+                    FieldValueMapper.map(valoresIA, campos);
+
+            System.out.println("===== CONFIRMADOS (WRITE IDS) =====");
+
+            confirmados.forEach(c ->
+                    System.out.println("[WRITE] " + c.getStableId() + " -> " + c.getValor())
+            );
+
+            System.out.println("===== CONFIRMADOS =====");
+
+            confirmados.forEach(c ->
+                    System.out.println(c.getStableId() + " -> " + c.getValor())
+            );
+
+            // 4️⃣ generar Word
+            return generarWord(version, confirmados, campos);
+
+        } catch (Exception e) {
+
+            e.printStackTrace();   // 🔥
+
+            throw new RuntimeException(
+                    "Error generando Word desde texto: " + e.getMessage(),
+                    e
+            );
+        }
+    }
+
+
+    private List<FieldDefinition> reconstruirCampos(Long plantillaId) {
+
+        List<PlantillaCampo> camposDB =
+                campoRepo.findByPlantillaId(plantillaId);
+
+        return camposDB.stream()
+                .map(c -> {
+
+                    FieldDefinition f = new FieldDefinition();
+
+                    f.setStableId(c.getReadStableId());
+                    f.setWriteStableId(c.getStableId());
+                    f.setDescription(c.getDescripcion());
+                    f.setDataType(c.getTipoDato());
+
+                    f.setInteractionType(c.getInteractionType());
+                    f.setPreservationMode(c.getPreservationMode());
+                    f.setTargetSemantics(c.getTargetSemantics());
+
+                    f.setWriteMode(c.getWriteMode());
+                    f.setWriteValue(c.getWriteValue());
+                    f.setExecutionHint(c.getExecutionHint());
+
+                    f.setRewriteText(c.getRewriteText());
+
+                    TargetRegion r = new TargetRegion();
+                    r.setMode(c.getTargetRegionMode());
+                    r.setAnchorText(c.getAnchorText());
+                    r.setSecondAnchorText(c.getSecondAnchorText());
+                    r.setRelativeRow(c.getRelativeRow());
+                    r.setRelativeCol(c.getRelativeCol());
+                    r.setReference(c.getReference());
+                    r.setHint(c.getTargetHint());
+
+                    f.setTargetRegion(r);
+
+                    return f;
+                })
+                .toList();
+    }
+
+    private List<FieldValueAI> normalizarValores(List<FieldValueAI> valores) {
+
+        Map<String, FieldValueAI> map = new LinkedHashMap<>();
+
+        for (FieldValueAI v : valores) {
+
+            if (v.getStableId() == null) continue;
+            if (v.getValor() == null || v.getValor().length() < 2) continue;
+
+            if (map.containsKey(v.getStableId())) {
+                System.out.println("⚠️ duplicado IA: " + v.getStableId());
+            }
+
+            map.put(v.getStableId(), v);
+        }
+
+
+
+        return new ArrayList<>(map.values());
     }
 }

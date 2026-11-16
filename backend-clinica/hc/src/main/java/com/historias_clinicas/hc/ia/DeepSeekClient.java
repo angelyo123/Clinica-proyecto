@@ -75,6 +75,7 @@ public class DeepSeekClient {
             txt = "[" + txt + "]";
         }
 
+
         return txt;
     }
 
@@ -115,6 +116,11 @@ public class DeepSeekClient {
 
             String raw = ejecutarConRetry(body);
             String limpio = limpiarJSON(raw);
+
+            if (!limpio.endsWith("}")) {
+                log.warn("⚠️ JSON posiblemente truncado, intentando cerrar...");
+                limpio = limpio + "]}";
+            }
 
             if (limpio == null || limpio.isBlank()) {
                 return List.of();
@@ -726,6 +732,19 @@ NO agregues texto fuera del JSON.
         }
 
         mapper.readTree(contenido);
+    }
+
+    public String call(String prompt) {
+
+        Map<String, Object> body = Map.of(
+                "model", "deepseek-chat",
+                "max_tokens", 4096,
+                "messages", List.of(
+                        Map.of("role", "user", "content", prompt)
+                )
+        );
+
+        return ejecutarConRetry(body);
     }
 
 }

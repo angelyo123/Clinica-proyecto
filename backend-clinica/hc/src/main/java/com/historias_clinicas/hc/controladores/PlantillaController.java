@@ -86,5 +86,23 @@ public class PlantillaController {
         }
     }
 
+    @GetMapping("/{plantillaId}/cognitive-debug")
+    public ResponseEntity<?> verCognitivePayload(@PathVariable Long plantillaId) {
+
+        try {
+
+            Map<String,Object> data =
+                    plantillaProcessorService.debugCognitivePayload(plantillaId);
+
+            return ResponseEntity.ok(data);
+
+        } catch (Exception e) {
+
+            return ResponseEntity.internalServerError().body(
+                    Map.of("error", e.getMessage())
+            );
+        }
+    }
+
 
 }

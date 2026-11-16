@@ -2,54 +2,69 @@ package com.historias_clinicas.hc.entidades;
 import jakarta.persistence.*;
 import lombok.*;
 
+import jakarta.persistence.*;
+import lombok.*;
 
 @Entity
-@Data
-@Builder
+@Getter
+@Setter
 @NoArgsConstructor
 @AllArgsConstructor
+@Builder
 public class PlantillaCampo {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne
+    private Long plantillaId;
+
+
+
+    @Column(length = 500, nullable = false)
+    private String descripcion;
+
+    @Column(length = 30, nullable = false)
+    private String tipoDato;
+
+    @Column(length = 50)
+    private String geom;
+
+    @Column(length = 50)
+    private String blockHash;
+
+    @Column(length = 50)
+    private String anchorHash;
+
+    private Long snapshotId;
+
+    @Column(length = 120, nullable = false)
+    private String stableId;
+
+    @Column(length = 120)
+    private String readStableId;
+
+
+    private String interactionType;
+    private String preservationMode;
+    private String targetSemantics;
+
+    private String writeMode;
+    private String writeValue;
+    private String executionHint;
+
+    private String targetRegionMode;
+    private String anchorText;
+    private String secondAnchorText;
+    private Integer relativeRow;
+    private Integer relativeCol;
+    private String reference;
+    private String targetHint;
+    private String rewriteText;
+
+
+    // 🔹 ESTA ES LA RELACIÓN QUE FALTA
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "seccion_id")
     private PlantillaSeccion seccion;
-
-    /**
-     * Nombre lógico del campo (edad, relato, fc, etc.)
-     */
-    private String nombreCampo;
-
-    /**
-     * Texto original detectado en la plantilla (etiqueta o contenido)
-     */
-    private String textoOriginal;
-
-    /**
-     * TIPO DE CAMPO DETECTADO
-     * Ejemplos: linea_punteada, celda_vacia, subrayado, puntos
-     */
-    private String tipoCampo;
-
-    /**
-     * POSICIÓN EXACTA EN EL WORD
-     * Permite volver al párrafo exacto y reemplazar runs.
-     */
-
-    private String descripcionCampo;
-
-    private Integer indexParrafo;
-
-    private Integer indexRunInicio;
-
-    private Integer indexRunFin;
-    private Integer itemIndex;
-
-    /** Si está dentro de tabla */
-    private Integer indexTabla;      // null si está fuera
-    private Integer indexFila;
-    private Integer indexCelda;
-
 }

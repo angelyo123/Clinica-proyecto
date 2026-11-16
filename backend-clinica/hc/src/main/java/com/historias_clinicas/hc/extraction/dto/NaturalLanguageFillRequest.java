@@ -1,4 +1,4 @@
-package com.historias_clinicas.hc.extraction;
+package com.historias_clinicas.hc.extraction.dto;
 
 import com.historias_clinicas.hc.cognitive.FieldDefinition;
 import lombok.Data;

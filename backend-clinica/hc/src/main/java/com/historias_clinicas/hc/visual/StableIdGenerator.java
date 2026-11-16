@@ -2,74 +2,106 @@ package com.historias_clinicas.hc.visual;
 
 import org.apache.commons.codec.digest.DigestUtils;
 
-public class generarIds {
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+public final class StableIdGenerator {
 
     public void generarIds(VisualDocument doc) {
 
         for (VisualBlock block : doc.getBlocks()) {
 
-            if (block instanceof TableBlock tb) {
+            if (!(block instanceof TableBlock tb)) continue;
 
-                TableGrid grid = tb.getGrid();
-                CellVisual[][] matrix = grid.getMatrix();
+            String blockHash = buildBlockHash(doc, tb);
 
-                for (int r = 0; r < grid.getTotalRows(); r++) {
-                    for (int c = 0; c < grid.getTotalCols(); c++) {
+            TableGrid grid = tb.getGrid();
+            CellVisual[][] m = grid.getMatrix();
 
-                        CellVisual cell = matrix[r][c];
+            for (int r = 0; r < grid.getTotalRows(); r++) {
+                for (int c = 0; c < grid.getTotalCols(); c++) {
 
-                        if (cell != null && cell.isMaster()) {
+                    CellVisual cell = m[r][c];
+                    if (cell == null || !cell.isMaster()) continue;
 
-                            String base =
-                                    "B" + tb.getBodyIndex() +
-                                            "T" + tb.getTableIndex() +
-                                            "R" + r +
-                                            "C" + c;
+                    String geom = "R" + r + "C" + c +
+                            "rs" + cell.getRowSpan() +
+                            "cs" + cell.getColSpan();
 
-                            String contexto =
-                                    obtenerContextoFila(matrix, r);
+                    String left = nearestLeftLabel(m, r, c);
+                    String top  = nearestTopLabel(m, r, c);
 
-                            String hash =
-                                    DigestUtils.sha1Hex(contexto);
+                    String anchor = normalize(left) + "|" + normalize(top);
 
-                            cell.setStableId(base + "#" + hash.substring(0,8));
-                        }
-                    }
+                    String anchorHash =
+                            DigestUtils.sha1Hex(anchor).substring(0, 10);
+
+                    String path = cell.getPath();
+
+                    cell.setStableId(
+                            "B" + blockHash.substring(0,8)
+                                    + "/" + path
+                                    + "/" + geom
+                                    + "#" + anchorHash
+                    );
                 }
             }
         }
     }
 
-    private String obtenerContextoFila(CellVisual[][] matrix, int fila) {
+    private String buildBlockHash(VisualDocument doc, TableBlock tb) {
 
-        StringBuilder sb = new StringBuilder();
+        String title = "";
+        String firstRow = "";
 
-        // Fila anterior
-        if (fila - 1 >= 0) {
-            sb.append(extraerTextoFila(matrix[fila - 1]));
-        }
-
-        // Fila actual
-        sb.append(extraerTextoFila(matrix[fila]));
-
-        // Fila siguiente
-        if (fila + 1 < matrix.length) {
-            sb.append(extraerTextoFila(matrix[fila + 1]));
-        }
-
-        return sb.toString();
-    }
-
-    private String extraerTextoFila(CellVisual[] fila) {
-
-        StringBuilder sb = new StringBuilder();
-
-        for (CellVisual cell : fila) {
-            if (cell != null && cell.isMaster()) {
-                sb.append(cell.getText()).append("|");
+        // buscar párrafos antes
+        for (VisualBlock b : doc.getBlocks()) {
+            if (b instanceof ParagraphBlock p &&
+                    p.getBodyIndex() < tb.getBodyIndex()) {
+                title += p.getText() + "|";
             }
         }
 
-        return sb.toString();
+        // primera fila no vacía
+        CellVisual[][] m = tb.getGrid().getMatrix();
+        for (CellVisual cell : m[0]) {
+            if (cell != null && cell.isMaster() &&
+                    !cell.getText().isBlank()) {
+                firstRow += cell.getText() + "|";
+            }
+        }
+
+        return DigestUtils.sha1Hex(title + firstRow);
+    }
+
+    private String nearestLeftLabel(CellVisual[][] m, int r, int c) {
+        for (int cc = c - 1; cc >= 0; cc--) {
+            CellVisual x = m[r][cc];
+            if (x != null && x.isMaster() &&
+                    x.getText() != null &&
+                    !x.getText().isBlank()) {
+                return x.getText();
+            }
+        }
+        return "";
+    }
+
+    private String nearestTopLabel(CellVisual[][] m, int r, int c) {
+        for (int rr = r - 1; rr >= 0; rr--) {
+            CellVisual x = m[rr][c];
+            if (x != null && x.isMaster() &&
+                    x.getText() != null &&
+                    !x.getText().isBlank()) {
+                return x.getText();
+            }
+        }
+        return "";
+    }
+
+    private String normalize(String s) {
+        if (s == null) return "";
+        return s.trim().toLowerCase().replaceAll("\\s+", " ");
     }
 }

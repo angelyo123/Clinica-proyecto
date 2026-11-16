@@ -1,4 +1,9 @@
 package com.historias_clinicas.hc.visual;
 
-public interface VisualBlock {
+public sealed interface VisualBlock
+        permits ParagraphBlock, TableBlock {
+
+    String getPath();
+
+    int getVisualIndex();
 }

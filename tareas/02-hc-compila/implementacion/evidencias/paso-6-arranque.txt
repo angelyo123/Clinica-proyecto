@@ -1,0 +1,27 @@
+Tarea 02 — Paso 6: arranque de hc (2026-11-16)
+Rama: tarea/02-hc-compila (stash@{1} aplicado, sin commit)
+Comando: ./mvnw -o -q package -DskipTests  y  $JAVA_HOME/bin/java -jar target/<jar>  (Java 17.0.16)
+Se esperó 25 s después del arranque para que JODConverter conectara con LibreOffice.
+
+--- Extracto del log ---
+>>> Iniciando LibreOffice...
+>>> LibreOffice iniciado correctamente.
+2026-11-16T15:37:29.187-05:00 INFO 20452 --- [hc] [ main] o.s.b.w.embedded.tomcat.TomcatWebServer : Tomcat started on port 8088 (http) with context path '/'
+2026-11-16T15:37:29.428-05:00 INFO 20452 --- [hc] [ main] c.historias_clinicas.hc.HcApplication : Started HcApplication in 8.195 seconds (process running for 8.78)
+2026-11-16T15:37:38.412-05:00 INFO 20452 --- [hc] [er-offprocmng-0] o.j.local.office.OfficeConnection : Connected: 'socket,host=127.0.0.1,port=2002,tcpNoDelay=1'
+2026-11-16T15:37:38.473-05:00 INFO 20452 --- [hc] [er-offprocmng-1] o.j.local.office.OfficeConnection : Connected: 'socket,host=127.0.0.1,port=2005,tcpNoDelay=1'
+
+Errores 'Could not start the office process': 0
+WARN: 4, ninguno bloqueante:
+  - open-in-view activado por defecto;
+  - el dialecto de PostgreSQL se declara sin necesidad;
+  - 2 × "Profile dir ... already exists" (perfiles temporales de LibreOffice que quedaron del intento anterior).
+ERROR: 0
+
+--- Prueba HTTP ---
+GET http://localhost:8088/hc/plantilla/999999/poi -> 500 (plantilla inexistente; el controlador responde con su manejo de error, el puerto atiende)
+
+--- Notas ---
+* Con el 'java' del PATH (Java 8) el jar no arranca (UnsupportedClassVersionError). Hay que usar el de JAVA_HOME (Java 17).
+* Un primer intento mostró 'Could not start the office process': lo causó el script de prueba, que mató los procesos soffice antes de que conectaran. Con la espera, 0 errores.
+* Se levantan dos procesos de LibreOffice (PdfGenerator en el puerto 2002 y JodConverterConfig en el 2005). Funciona, pero conviene unificarlos (ver ficha 14).

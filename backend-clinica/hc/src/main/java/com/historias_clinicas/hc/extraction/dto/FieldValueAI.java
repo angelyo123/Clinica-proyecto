@@ -1,4 +1,4 @@
-package com.historias_clinicas.hc.extraction;
+package com.historias_clinicas.hc.extraction.dto;
 
 import lombok.Data;
 
