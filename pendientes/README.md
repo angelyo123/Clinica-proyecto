@@ -39,8 +39,6 @@ flowchart LR
 |---|---|---|---|---|
 | 01 | [Sacar las claves del repositorio](01-claves-fuera-del-repo.md) — **en espera** por decisión tuya | 0 · Base estable | Mediana | — |
 | 21 | [Elegir el proveedor de IA desde el front](21-selector-proveedor-ia.md) | 0 · Base estable | Mediana | 02 |
-| 03 | [Conjunto de prueba (plantilla + fotos + respuestas)](03-dataset-de-prueba.md) | 1 · Validar lectura | Mediana | Cliente |
-| 04 | [Experimento de lectura de fotos](04-experimento-lectura.md) | 1 · Validar lectura | Mediana | 03 |
 | 05 | [Base del backend del producto](05-base-backend-hc.md) | 2 · Núcleo backend | Compleja | 02 |
 | 06 | [Esquema de campos de las plantillas](06-esquema-de-plantillas.md) | 2 · Núcleo backend | Mediana | 03, 05 |
 | 07 | [Llenado con marcadores (sin IA)](07-llenado-con-marcadores.md) | 2 · Núcleo backend | Compleja | 02, 06 |
@@ -58,7 +56,7 @@ flowchart LR
 | 19 | [Aprender de las correcciones](19-aprendizaje-de-correcciones.md) | 5 · Crecer | Mediana | 13, 15 |
 | 20 | [Horario-Service no compila (codificación)](20-horario-service-codificacion.md) | Fuera del producto HC | Simple | — |
 
-La tarea 02 ya está en curso: ver [`../tareas/`](../tareas/README.md).
+Las tareas 02, 03 y 04 ya están en curso: ver [`../tareas/`](../tareas/README.md).
 
 ### Dependencias
 
@@ -100,7 +98,6 @@ flowchart TD
 ```
 
 **Se puede avanzar en paralelo:**
-- La tarea 03 depende del cliente: pídele el material el primer día, mientras haces 02 y 21.
 - Las tareas 13 y 14 pueden avanzar durante la fase 3.
 
 ## Estimación gruesa (1 desarrollador)
@@ -108,7 +105,7 @@ flowchart TD
 | Fase | Tareas | Duración estimada |
 |---|---|---|
 | 0 · Base estable | 01–02 | 3–5 días |
-| 1 · Validar lectura | 03–04 | 1–2 semanas (depende de cuándo lleguen las fotos) |
+| 1 · Validar lectura | 03–04 | 1–2 semanas (en curso) |
 | 2 · Núcleo backend | 05–09 | 5–7 semanas |
 | 3 · Aplicaciones | 10–12 | 5–7 semanas |
 | 4 · Piloto | 13–15 | 2–3 semanas de preparación + 2–4 semanas de piloto |
@@ -124,24 +121,23 @@ Son unos 4 meses hasta empezar el piloto. **Hay que recalcular al terminar la fa
 - **Primero se valida la lectura de fotos**, porque es el mayor riesgo. El esquema de las primeras plantillas se escribe a mano.
 - **2026-11-16:** por ahora las claves no se mueven del repositorio (tarea 01 en espera). El proveedor de IA se podrá elegir desde el front (tarea 21).
 - **Se reutiliza el patrón de IDs estables:** la IA solo puede elegir elementos que existen, y después se valida su respuesta. Aplica tanto a las celdas de la plantilla como a las palabras de la foto.
+- **2026-11-16: no hay cliente.** El producto es un proyecto propio. El material de prueba se busca en internet: fotos reales de HC llenadas a mano. Las decisiones que el plan atribuía al cliente las tomas tú.
+- **2026-11-16: el experimento de lectura usa solo DeepSeek.** GPT queda fuera.
 
-## Pendientes con el cliente
+## Decisiones pendientes (antes atribuidas al cliente)
 
-| # | Qué se necesita | Para qué tarea | Estado |
+| # | Qué hay que decidir o conseguir | Para qué tarea | Estado |
 |---|---|---|---|
-| 1 | Una plantilla real de HC en Word (la más usada) | 03 | ⏳ |
-| 2 | 30–50 fotos de HC llenadas, con permiso de uso. Lo ideal es que el personal las llene a mano con datos ficticios | 03 | ⏳ |
-| 3 | Los valores correctos de esas HC, o alguien que valide la transcripción | 03 | ⏳ |
-| 4 | La precisión mínima aceptable y cuánto tarda hoy transcribir una HC a mano | 04, 15 | ⏳ |
-| 5 | Si las fotos serán del mismo formato que la plantilla o de otros formatos | 08, 18 | ⏳ |
-| 6 | Quiénes usarán la app (roles), qué teléfonos (Android/iOS) y cómo es la conectividad en planta | 10, 11, 13 | ⏳ |
-| 7 | Requisitos legales e institucionales sobre los datos de pacientes | 13 | ⏳ |
-| 8 | Clínica, usuarios y fechas para el piloto | 15 | ⏳ |
+| 1 | La precisión mínima aceptable por campo | 04, 15 | ⏳ |
+| 2 | Si las fotos serán del mismo formato que la plantilla o de otros formatos | 08, 18 | ⏳ |
+| 3 | Quiénes usarán la app (roles), qué teléfonos (Android/iOS) y cómo es la conectividad | 10, 11, 13 | ⏳ |
+| 4 | Requisitos legales sobre los datos de pacientes antes de usar fotos reales de una clínica | 13 | ⏳ |
+| 5 | Una clínica, usuarios y fechas para el piloto | 15 | ⏳ |
 
 ## Pendientes tuyos (fuera del código)
 
 - Tarea 01 en espera por decisión tuya. Las claves siguen en GitHub; conviene rotarlas antes del piloto con datos reales.
-- Crear cuentas de prueba en los proveedores de IA y OCR que se van a comparar (tarea 04).
+- La clave de DeepSeek del repositorio ya no sirve (responde 401), y la de OpenAI tampoco. El experimento usó una clave de prueba tuya que no se guardó en el repositorio.
 
 ## Fuera del producto HC (sin ficha por ahora)
 
